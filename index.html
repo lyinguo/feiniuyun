@@ -104,6 +104,18 @@
             </div>
           </fieldset>
 
+          <div class="field">
+            <span class="field-head">
+              形态提示词
+              <button id="resetPromptBtn" class="link-btn" type="button">恢复默认</button>
+            </span>
+            <textarea
+              id="formatPromptInput"
+              class="format-prompt"
+              spellcheck="false"
+              placeholder="切换目标形态会载入对应的改编提示词，可在此修改。"></textarea>
+          </div>
+
           <label class="field">
             <span>改编语气</span>
             <input id="toneInput" type="text" value="现实感、强冲突、可拍摄">

@@ -396,6 +396,33 @@ fieldset.field {
   flex: 1 1 0;
 }
 
+.field-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: var(--accent-strong);
+}
+
+.format-prompt {
+  line-height: 1.6;
+  min-height: 120px;
+  padding: 10px;
+  resize: vertical;
+}
+
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: 1fr;

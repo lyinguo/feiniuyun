@@ -41,6 +41,29 @@
 
 女人说：“想知道真相，就上车。”`;
 
+  const FORMAT_PROMPTS = {
+    web_series: `【短剧形态改编指引】
+- 开场 15 秒内必须抛出强钩子或冲突，先抓人再交代背景。
+- 节奏快、场景短，每场只服务一个明确目标，避免大段铺垫。
+- 每集结尾留下强悬念或反转，制造追看欲。
+- 对白口语化、信息密度高，尽量把冲突和心理外化为动作。`,
+    film: `【电影形态改编指引】
+- 按三幕结构组织：建置—对抗—结局，关注主角整体弧光。
+- 重视视听语言与场面调度，允许更长的情绪铺陈与留白。
+- 主题统一，关键转折点（激励事件、中点、低谷）清晰可辨。
+- 对白精炼，多用潜台词和视觉信息表达，少用直白旁白。`,
+    stage: `【舞台剧形态改编指引】
+- 时空相对集中，减少频繁转场，善用同一场景内人物的进出场。
+- 以对白和人物正面交锋驱动剧情，强调台词的戏剧张力。
+- 用舞台调度、灯光、道具提示替代影视镜头语言。
+- 可适度保留独白/旁白，注意现场表演的连贯与节奏。`,
+    audio_drama: `【广播剧形态改编指引】
+- 一切信息靠声音传达：对白、旁白、音效与环境声。
+- 每个角色声音特征鲜明，不能依赖视觉区分人物。
+- 用音效和台词交代地点、动作与时间，减少纯视觉描写。
+- 适当用旁白衔接场景，控制信息节奏，便于聆听理解。`
+  };
+
   const els = {
     novelInput: document.querySelector("#novelInput"),
     fileInput: document.querySelector("#fileInput"),
@@ -66,7 +89,9 @@
     scenePreview: document.querySelector("#scenePreview"),
     yamlOutput: document.querySelector("#yamlOutput"),
     statsLine: document.querySelector("#statsLine"),
-    chapterSelect: document.querySelector("#chapterSelect")
+    chapterSelect: document.querySelector("#chapterSelect"),
+    formatPromptInput: document.querySelector("#formatPromptInput"),
+    resetPromptBtn: document.querySelector("#resetPromptBtn")
   };
 
   let latestResult = null;
@@ -75,6 +100,8 @@
   let currentEpubFolder = "";
   let isEpubMode = false;      
   let epubChapterCount = 0;
+  const promptState = { ...FORMAT_PROMPTS };
+  let currentFormat = "web_series";
 
   function init() {
     els.novelInput.addEventListener("input", queueParse);
@@ -90,8 +117,34 @@
       els.densityValue.textContent = els.densityRange.value;
     });
     els.chapterSelect.addEventListener("change", loadEpubChapter);
+    initFormatPrompt();
     checkBackend();
     queueParse();
+  }
+
+  function initFormatPrompt() {
+    const checked = document.querySelector("[name='targetFormat']:checked");
+    currentFormat = checked ? checked.value : "web_series";
+    els.formatPromptInput.value = promptState[currentFormat];
+    document.querySelectorAll("[name='targetFormat']").forEach((radio) => {
+      radio.addEventListener("change", onFormatChange);
+    });
+    els.formatPromptInput.addEventListener("input", () => {
+      promptState[currentFormat] = els.formatPromptInput.value;
+    });
+    els.resetPromptBtn.addEventListener("click", resetCurrentPrompt);
+  }
+
+  function onFormatChange() {
+    promptState[currentFormat] = els.formatPromptInput.value;
+    const checked = document.querySelector("[name='targetFormat']:checked");
+    currentFormat = checked ? checked.value : currentFormat;
+    els.formatPromptInput.value = promptState[currentFormat];
+  }
+
+  function resetCurrentPrompt() {
+    promptState[currentFormat] = FORMAT_PROMPTS[currentFormat];
+    els.formatPromptInput.value = promptState[currentFormat];
   }
 
   async function loadEpubChapter(event) {
@@ -314,6 +367,9 @@
     epubChapterCount = 0;
     els.chapterSelect.style.display = 'none'; 
     els.chapterSelect.innerHTML = '<option value="">-- 选择章节预览 --</option>';
+
+    Object.assign(promptState, FORMAT_PROMPTS);
+    els.formatPromptInput.value = promptState[currentFormat];
 
     queueParse();
     setStatus("已清空工作台。");
