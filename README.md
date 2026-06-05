@@ -9,6 +9,7 @@
 app/
   api/                 FastAPI 路由
   core/                LLM 客户端、可选 MCP 接入
+  agent/script_graph/  LangGraph 多 Agent 剧本生成工作流
   models/              请求/响应模型
   services/            分章、记忆、生成编排、Schema 校验
   tools/               本地 tool/skill 上下文
@@ -94,6 +95,49 @@ POST /api/scripts/convert
 - `script`：结构化对象。
 - `memory_snapshot`：该 `user_id/thread_id` 的记忆快照。
 - `stats`：章节数、场景数、人物数、地点数、模型调用次数。
+
+## LangGraph 多 Agent 工作流
+
+新增的多 Agent 工作流位于 `app/agent/script_graph`：
+
+```text
+Archivist 档案员
+  -> 更新 global_characters / global_settings
+  -> 提取 canon_facts 和 continuity_risks
+
+Screenwriter 编剧
+  -> 使用 with_structured_output(ChapterScriptOutput)
+  -> 生成当前章节结构化剧本和 YAML
+
+Critic 审查员
+  -> 程序化 Schema 校验 + LLM 审查
+  -> 失败则 error_msg + retry_count，并回到 Screenwriter
+
+Summarizer 总结员
+  -> 更新 rolling_summary
+  -> 为下一章提供滚动记忆
+```
+
+图结构：
+
+```text
+Archivist -> Screenwriter -> Critic
+                         ^      |
+                         |      | failed && retry_count < max_retries
+                         +------+
+                                |
+                                | passed 或达到最大重试
+                                v
+                           Summarizer -> END
+```
+
+运行真实模型 Demo：
+
+```bash
+D:\anaconda\envs\super_biz311\python.exe -m app.agent.script_graph.demo --input samples/sample_novel.txt --output data/script_graph_demo_output.yaml
+```
+
+这个 Demo 会真实调用 `.env` 中配置的大模型。
 
 ## 怎么理解题目的难点
 
