@@ -21,6 +21,14 @@ class CoreServiceTests(unittest.TestCase):
         self.assertEqual(chapters[0].title, "第一章 开端")
         self.assertFalse(chapters[0].auto_generated)
 
+    def test_chapter_splitter_accepts_single_heading(self):
+        text = """第一章 开端
+甲推开门。"""
+        chapters = ChapterSplitter().split(text)
+        self.assertEqual(len(chapters), 1)
+        self.assertEqual(chapters[0].title, "第一章 开端")
+        self.assertFalse(chapters[0].auto_generated)
+
     def test_parse_json_object_accepts_fenced_json(self):
         data = parse_json_object('```json\n{"ok": true, "items": [1]}\n```')
         self.assertTrue(data["ok"])
@@ -63,6 +71,40 @@ class CoreServiceTests(unittest.TestCase):
         }
         report = ScreenplaySchemaValidator().validate(script)
         self.assertTrue(report.valid)
+
+    def test_schema_validator_allows_single_chapter_processing(self):
+        script = {
+            "schema_version": "1.0",
+            "project": {"title": "T"},
+            "source": {"chapter_count": 1},
+            "memory": {},
+            "characters": [{"id": "char_001", "name": "甲"}],
+            "locations": [{"id": "loc_001", "name": "门口"}],
+            "script": {
+                "episodes": [
+                    {
+                        "acts": [
+                            {
+                                "scenes": [
+                                    {
+                                        "scene_id": "ch001_s001",
+                                        "source_ref": {"chapter_index": 1},
+                                        "slugline": {"location_id": "loc_001"},
+                                        "characters": ["char_001"],
+                                        "dialogue": [{"speaker": "char_001", "line": "走。"}],
+                                        "purpose": "建立目标",
+                                        "conflict": "必须离开",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+        }
+        report = ScreenplaySchemaValidator().validate(script)
+        self.assertTrue(report.valid)
+        self.assertTrue(report.warnings)
 
 
 if __name__ == "__main__":

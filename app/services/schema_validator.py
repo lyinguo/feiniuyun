@@ -35,8 +35,12 @@ class ScreenplaySchemaValidator:
 
         source = data.get("source") or {}
         chapter_count = int(source.get("chapter_count") or 0)
-        if chapter_count < 3:
-            errors.append("source.chapter_count must be >= 3.")
+        if chapter_count < 1:
+            errors.append("source.chapter_count must be >= 1.")
+        elif chapter_count < 3:
+            warnings.append(
+                "source.chapter_count is less than 3; treating input as chapter-by-chapter processing."
+            )
 
         character_ids = self._unique_ids(data.get("characters") or [], "characters", errors)
         location_ids = self._unique_ids(data.get("locations") or [], "locations", errors)

@@ -37,8 +37,8 @@ class NovelAdaptationService:
         chapters = chapter_splitter.split(request.novel_text)
         diagnostics: list[str] = []
 
-        if len(chapters) < 3:
-            raise AdaptationError("至少需要 3 个章节以上的小说文本。")
+        # if len(chapters) < 3:
+        #     raise AdaptationError("至少需要 3 个章节以上的小说文本。")
 
         if any(chapter.auto_generated for chapter in chapters):
             diagnostics.append(

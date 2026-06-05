@@ -51,7 +51,7 @@ class ChapterSplitter:
             if len(trimmed) <= 80 and self.heading_pattern.match(trimmed):
                 markers.append((line_index, trimmed.lstrip("#").strip()))
 
-        if len(markers) >= 2:
+        if markers:
             chapters: list[Chapter] = []
             for index, (marker_line, title) in enumerate(markers, start=1):
                 next_line = markers[index][0] if index < len(markers) else len(lines)
