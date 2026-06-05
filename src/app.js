@@ -124,6 +124,67 @@
   async function handleFile(event) {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
+    // --- 新增：如果是 EPUB 文件，走后端接口 ---
+    if (file.name.endsWith('.epub')) {
+        els.novelInput.value = "正在上传并让后端解析 EPUB 文件，请稍候...";
+        
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('/api/parse-epub', { 
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // 打印到控制台，方便你随时查看后端到底返回了啥
+            console.log("后端返回的数据:", data); 
+
+            if (data.status === 'success') {
+                const info = data.data; // 拿到后端传回的 metadata 字典
+                
+                // 把统计信息漂亮地展示在文本框里
+                els.novelInput.value = 
+                    `✅ EPUB 处理成功！\n\n` +
+                    `📖 书名：《${info.book_title || '未知书名'}》\n` +
+                    `📑 总章节：${info.chapters ? info.chapters.length : 0} 章\n` +
+                    `🔤 总字数：约 ${info.total_char_count || 0} 字\n` +
+                    `🤖 估算消耗：${info.total_estimated_tokens || 0} Tokens\n\n` +
+                    `文件已自动拆分并保存在服务器端，您可以直接进行下一步操作！`;
+                // 2. 将后端返回的章节数组，映射成 renderChapterList 需要的格式
+                const mappedChapters = (info.chapters || []).map(ch => ({
+                    title: ch.original_title,         // 章节标题
+                    text: { length: ch.char_count },  // 伪造一个 text 对象，让渲染器能读取 .length
+                    auto: false                       // 标记为真实章节，不显示“自动”标签
+                }));
+
+                // 3. 手动更新左侧的数字统计
+                els.chapterCount.textContent = String(mappedChapters.length);
+                els.charCount.textContent = String(info.total_char_count || 0);
+
+                // 4. 调用你原本的方法渲染列表！
+                renderChapterList(mappedChapters);
+
+                // 5. 重新进行警告校验（复用你原本的逻辑规则）
+                const warnings = [];
+                if (mappedChapters.length > 0 && mappedChapters.length < 3) warnings.push("题目要求 3 章以上；当前章节数不足。");
+                if (!els.userIdInput.value.trim()) warnings.push("User ID 不能为空。");
+                if (!els.threadIdInput.value.trim()) warnings.push("Thread ID 不能为空。");
+                
+                els.convertBtn.disabled = warnings.length > 0 || mappedChapters.length === 0;
+                renderWarnings(warnings);
+                // 触发后续逻辑
+                // els.novelInput.dispatchEvent(new Event('input')); 
+            } else {
+                els.novelInput.value = "❌ 解析失败：" + data.message;
+            }
+        })
+        .catch(err => {
+            els.novelInput.value = "❌ 网络请求失败：" + err.message;
+        });
+        
+        return; // 结束，不往下走纯文本解析逻辑了
+    }
     setStatus(`正在读取 ${file.name} ...`);
     try {
       const result = await readNovelFile(file);

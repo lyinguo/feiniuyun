@@ -9,3 +9,5 @@ venv/
 data/memory/
 *.log
 data/real_book/*.zip
+tests_py/test_epub/
+data/temp_epubs/
