@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI 小说转剧本工具
 
 这是一个“前端 + Python 后端 + 真实大模型调用”的 AI 辅助剧本创作工具。输入 3 章以上小说文本后，后端按章节调用大模型，生成结构化剧本 YAML 初稿，并维护 `user_id/thread_id` 隔离的长短期记忆。
@@ -107,3 +108,16 @@ python -m py_compile app/main.py app/core/llm_client.py app/services/adaptation_
 ```
 
 测试不会调用大模型，只检查核心非 LLM 模块。
+=======
+大体架构
+
+---
+技术栈             (暂定，写到README.md)
+编排控制层：LangChain + LangGraph（架构）
+组件：RAG、Chroma/Milvus 向量数据库、LangGraph State（长短期记忆）
+任务持久化调度：用户标识、任务流水 ID、SQLite/Redis 检查点
+工具解耦层：MCP  工具调用
+前端可视化：Vue3  
+
+---
+>>>>>>> 535b906021a45f8685656f6420bcea47f1ab6a95
