@@ -151,10 +151,12 @@
                     `🔤 总字数：约 ${info.total_char_count || 0} 字\n` +
                     `🤖 估算消耗：${info.total_estimated_tokens || 0} Tokens\n\n` +
                     `文件已自动拆分并保存在服务器端，您可以直接进行下一步操作！`;
+                    
                 // 2. 将后端返回的章节数组，映射成 renderChapterList 需要的格式
                 const mappedChapters = (info.chapters || []).map(ch => ({
                     title: ch.original_title,         // 章节标题
-                    text: { length: ch.char_count },  // 伪造一个 text 对象，让渲染器能读取 .length
+                    // 【关键修复】：兼容新老字段，优先读取 total_char_count
+                    text: { length: ch.total_char_count || ch.char_count || 0 },  
                     auto: false                       // 标记为真实章节，不显示“自动”标签
                 }));
 
