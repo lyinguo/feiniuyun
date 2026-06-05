@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI 小说转剧本工具</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="src/app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>AI 小说转剧本工作台</h1>
+          <p id="statusText">请启动 Python 后端，然后输入 3 章以上小说文本。</p>
+        </div>
+        <div class="topbar-actions">
+          <span class="metric"><strong id="chapterCount">0</strong> 章</span>
+          <span class="metric"><strong id="charCount">0</strong> 字</span>
+        </div>
+      </header>
+
+      <section class="workspace" aria-label="小说转剧本工作区">
+        <section class="panel input-panel" aria-labelledby="inputTitle">
+          <div class="panel-title">
+            <h2 id="inputTitle">小说输入</h2>
+            <span class="status-chip">3 章以上</span>
+          </div>
+
+          <div class="toolbar">
+            <label class="button secondary" for="fileInput">导入 TXT/MD</label>
+            <input id="fileInput" type="file" accept=".txt,.md,.markdown,text/plain,text/markdown">
+            <button id="sampleBtn" class="button secondary" type="button">载入示例</button>
+            <button id="clearBtn" class="button ghost" type="button">清空</button>
+          </div>
+
+          <textarea
+            id="novelInput"
+            spellcheck="false"
+            placeholder="粘贴至少三章小说文本。章节标题建议使用“第一章”“第二章”“Chapter 1”等格式。"></textarea>
+
+          <div class="subgrid">
+            <section>
+              <h3>章节识别</h3>
+              <ol id="chapterList" class="compact-list">
+                <li class="empty">导入文本后显示章节识别结果。</li>
+              </ol>
+            </section>
+            <section>
+              <h3>提醒</h3>
+              <ul id="warningList" class="compact-list">
+                <li class="ok">当前没有阻断性提醒。</li>
+              </ul>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel control-panel" aria-labelledby="controlTitle">
+          <div class="panel-title">
+            <h2 id="controlTitle">后端参数</h2>
+            <button id="convertBtn" class="button primary" type="button" disabled>调用大模型</button>
+          </div>
+
+          <div class="two-fields">
+            <label class="field">
+              <span>User ID</span>
+              <input id="userIdInput" type="text" value="author_demo" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Thread ID</span>
+              <input id="threadIdInput" type="text" value="adaptation_001" autocomplete="off">
+            </label>
+          </div>
+
+          <label class="field">
+            <span>项目名</span>
+            <input id="titleInput" type="text" placeholder="留空则后端自动识别">
+          </label>
+
+          <fieldset class="field">
+            <legend>目标形态</legend>
+            <div class="segmented">
+              <label>
+                <input type="radio" name="targetFormat" value="web_series" checked>
+                <span>短剧</span>
+              </label>
+              <label>
+                <input type="radio" name="targetFormat" value="film">
+                <span>电影</span>
+              </label>
+              <label>
+                <input type="radio" name="targetFormat" value="stage">
+                <span>舞台</span>
+              </label>
+              <label>
+                <input type="radio" name="targetFormat" value="audio_drama">
+                <span>广播剧</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <label class="field">
+            <span>改编语气</span>
+            <input id="toneInput" type="text" value="现实感、强冲突、可拍摄">
+          </label>
+
+          <label class="field">
+            <span>每章拆场密度 <strong id="densityValue">3</strong></span>
+            <input id="densityRange" type="range" min="1" max="6" value="3">
+          </label>
+
+          <div class="two-fields">
+            <label class="field">
+              <span>每集章节数</span>
+              <input id="episodeSize" type="number" min="1" max="20" value="3">
+            </label>
+            <label class="field">
+              <span>短期记忆窗口</span>
+              <input id="shortWindow" type="number" min="1" max="8" value="2">
+            </label>
+          </div>
+
+          <section class="memory-panel">
+            <div class="panel-title slim">
+              <h2>记忆状态</h2>
+              <span id="statsLine" class="soft-text">尚未生成</span>
+            </div>
+            <ul id="memoryList" class="memory-list">
+              <li class="empty">生成后显示该 user/thread 的短期记忆与长期故事圣经。</li>
+            </ul>
+          </section>
+        </section>
+
+        <section class="panel output-panel" aria-labelledby="outputTitle">
+          <div class="panel-title">
+            <h2 id="outputTitle">剧本 YAML</h2>
+            <div class="toolbar">
+              <button id="copyBtn" class="button secondary" type="button" disabled>复制</button>
+              <button id="downloadBtn" class="button secondary" type="button" disabled>下载</button>
+            </div>
+          </div>
+
+          <textarea id="yamlOutput" class="yaml-output" spellcheck="false" readonly></textarea>
+
+          <section>
+            <h3>场景预览</h3>
+            <ol id="scenePreview" class="scene-list">
+              <li class="empty">后端生成后显示前若干场戏预览。</li>
+            </ol>
+          </section>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

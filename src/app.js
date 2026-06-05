@@ -1,0 +1,344 @@
+(function () {
+  "use strict";
+
+  const API_BASE = window.location.protocol === "file:" ? "http://127.0.0.1:8000" : "";
+
+  const sampleNovel = `《雨灯档案》
+
+第一章 雨夜的信
+
+雨夜里，旧城派出所的灯坏了一半。林越推开档案室的门，看见阿岚正站在窗边，手里攥着一封没有署名的信。
+
+阿岚低声说：“他们没有把案子结掉，只是把名字藏起来了。”
+
+林越拿起信，纸面被雨水洇开，只剩下“南桥仓库”和“名单”两个词。他想起三年前失踪的父亲，胸口像被旧钉子顶住。
+
+走廊传来脚步声。值班警员老周提醒：“今晚别去南桥，那边有人盯着。”
+
+林越却把信塞进外套：“如果名单是真的，我必须去。”
+
+第二章 南桥仓库
+
+南桥仓库靠着河，铁门被风吹得来回撞。林越和阿岚穿过积水，发现门口有新鲜轮胎印。
+
+阿岚问道：“你确定要进去？这可能是陷阱。”
+
+林越没有回答。他在仓库深处看见一排旧货柜，其中一个货柜上刻着父亲的警号。货柜里没有尸体，只有一台还亮着红灯的录音机。
+
+录音机里传出男人的声音：“别相信档案，真正的名单在北站。”
+
+灯忽然灭了。黑暗中有人喊：“把录音机留下！”
+
+第三章 北站清晨
+
+清晨的北站广场空得像一张白纸。林越把录音机交给老周，老周的手却抖了一下。
+
+阿岚看见老周袖口沾着仓库里的红漆，立刻拦住林越：“他昨晚去过南桥。”
+
+老周沉默很久，终于说道：“你父亲不是失踪，是被自己人送走的。名单会害死所有还活着的人。”
+
+远处第一班车进站，广播声盖住了雨声。林越望向检票口，一个戴黑帽的女人递来一张车票。
+
+女人说：“想知道真相，就上车。”`;
+
+  const els = {
+    novelInput: document.querySelector("#novelInput"),
+    fileInput: document.querySelector("#fileInput"),
+    sampleBtn: document.querySelector("#sampleBtn"),
+    clearBtn: document.querySelector("#clearBtn"),
+    convertBtn: document.querySelector("#convertBtn"),
+    copyBtn: document.querySelector("#copyBtn"),
+    downloadBtn: document.querySelector("#downloadBtn"),
+    userIdInput: document.querySelector("#userIdInput"),
+    threadIdInput: document.querySelector("#threadIdInput"),
+    titleInput: document.querySelector("#titleInput"),
+    toneInput: document.querySelector("#toneInput"),
+    densityRange: document.querySelector("#densityRange"),
+    densityValue: document.querySelector("#densityValue"),
+    episodeSize: document.querySelector("#episodeSize"),
+    shortWindow: document.querySelector("#shortWindow"),
+    chapterCount: document.querySelector("#chapterCount"),
+    charCount: document.querySelector("#charCount"),
+    statusText: document.querySelector("#statusText"),
+    warningList: document.querySelector("#warningList"),
+    chapterList: document.querySelector("#chapterList"),
+    memoryList: document.querySelector("#memoryList"),
+    scenePreview: document.querySelector("#scenePreview"),
+    yamlOutput: document.querySelector("#yamlOutput"),
+    statsLine: document.querySelector("#statsLine")
+  };
+
+  let latestResult = null;
+  let parseTimer = null;
+  let abortController = null;
+
+  function init() {
+    els.novelInput.addEventListener("input", queueParse);
+    els.userIdInput.addEventListener("input", queueParse);
+    els.threadIdInput.addEventListener("input", queueParse);
+    els.sampleBtn.addEventListener("click", loadSample);
+    els.clearBtn.addEventListener("click", clearAll);
+    els.convertBtn.addEventListener("click", convert);
+    els.copyBtn.addEventListener("click", copyYaml);
+    els.downloadBtn.addEventListener("click", downloadYaml);
+    els.fileInput.addEventListener("change", handleFile);
+    els.densityRange.addEventListener("input", () => {
+      els.densityValue.textContent = els.densityRange.value;
+    });
+    checkBackend();
+    queueParse();
+  }
+
+  async function checkBackend() {
+    try {
+      const response = await fetch(`${API_BASE}/api/health`);
+      const payload = await response.json();
+      const configured = Boolean(payload.data && payload.data.llm_configured);
+      setStatus(configured ? "后端已连接，大模型已配置。" : "后端已连接，但还没有配置 LLM_API_KEY。");
+    } catch (_) {
+      setStatus("未连接 Python 后端：请运行 uvicorn app.main:app --reload --port 8000。");
+    }
+  }
+
+  function queueParse() {
+    window.clearTimeout(parseTimer);
+    parseTimer = window.setTimeout(updateInputPreview, 120);
+  }
+
+  function updateInputPreview() {
+    const text = els.novelInput.value;
+    const chapters = splitChapters(text);
+    els.chapterCount.textContent = String(chapters.length);
+    els.charCount.textContent = String(text.trim().length);
+
+    const warnings = [];
+    if (text.trim() && chapters.length < 3) warnings.push("题目要求 3 章以上；当前章节数不足。");
+    if (!els.userIdInput.value.trim()) warnings.push("User ID 不能为空。");
+    if (!els.threadIdInput.value.trim()) warnings.push("Thread ID 不能为空。");
+
+    els.convertBtn.disabled = warnings.length > 0 || !text.trim();
+    renderChapterList(chapters);
+    renderWarnings(warnings);
+  }
+
+  async function handleFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    setStatus(`正在读取 ${file.name} ...`);
+    try {
+      els.novelInput.value = await file.text();
+      setStatus(`已导入 ${file.name}。`);
+      queueParse();
+    } catch (error) {
+      setStatus(`文件读取失败：${error.message}`);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function loadSample() {
+    els.novelInput.value = sampleNovel;
+    els.titleInput.value = "雨灯档案";
+    queueParse();
+    setStatus("已加载三章示例小说。");
+  }
+
+  function clearAll() {
+    if (abortController) abortController.abort();
+    els.novelInput.value = "";
+    els.yamlOutput.value = "";
+    latestResult = null;
+    els.copyBtn.disabled = true;
+    els.downloadBtn.disabled = true;
+    renderMemory(null);
+    renderScenes(null);
+    queueParse();
+    setStatus("已清空工作台。");
+  }
+
+  async function convert() {
+    const payload = buildPayload();
+    abortController = new AbortController();
+    els.convertBtn.disabled = true;
+    setStatus("正在调用 Python 后端和真实大模型，请稍候 ...");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/scripts/convert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: abortController.signal
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.detail || body.message || `HTTP ${response.status}`);
+      }
+
+      latestResult = body.data;
+      els.yamlOutput.value = latestResult.yaml || "";
+      els.copyBtn.disabled = !latestResult.yaml;
+      els.downloadBtn.disabled = !latestResult.yaml;
+      renderWarnings(latestResult.diagnostics || []);
+      renderMemory(latestResult);
+      renderScenes(latestResult);
+      renderStats(latestResult.stats || {});
+      setStatus("后端已生成剧本 YAML。");
+    } catch (error) {
+      if (error.name === "AbortError") {
+        setStatus("请求已取消。");
+      } else {
+        setStatus(`生成失败：${error.message}`);
+        renderWarnings([error.message]);
+      }
+    } finally {
+      abortController = null;
+      queueParse();
+    }
+  }
+
+  function buildPayload() {
+    const target = document.querySelector("[name='targetFormat']:checked");
+    return {
+      user_id: els.userIdInput.value.trim(),
+      thread_id: els.threadIdInput.value.trim(),
+      novel_text: els.novelInput.value,
+      title: els.titleInput.value.trim() || null,
+      target_format: target ? target.value : "web_series",
+      adaptation_tone: els.toneInput.value.trim() || "现实感、强冲突、可拍摄",
+      scene_density: Number(els.densityRange.value),
+      chapters_per_episode: Number(els.episodeSize.value),
+      short_term_window: Number(els.shortWindow.value)
+    };
+  }
+
+  async function copyYaml() {
+    if (!els.yamlOutput.value) return;
+    await navigator.clipboard.writeText(els.yamlOutput.value);
+    setStatus("YAML 已复制到剪贴板。");
+  }
+
+  function downloadYaml() {
+    if (!els.yamlOutput.value) return;
+    const blob = new Blob([els.yamlOutput.value], { type: "text/yaml;charset=utf-8" });
+    const link = document.createElement("a");
+    const title = (els.titleInput.value.trim() || "novel_script").replace(/[\\/:*?"<>|]/g, "_");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${title}.script.yaml`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+    setStatus("YAML 文件已下载。");
+  }
+
+  function splitChapters(rawText) {
+    const text = String(rawText || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    if (!text) return [];
+    const lines = text.split("\n");
+    const markers = [];
+    const pattern = /^\s*(?:#{1,3}\s*)?((?:第\s*[零〇一二两三四五六七八九十百千万\d]+\s*[章节回幕卷部](?:\s*[^\n]{0,40})?)|(?:chapter\s+\d+(?:[:：\s-][^\n]{0,40})?))\s*$/i;
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      if (trimmed.length <= 80 && pattern.test(trimmed)) {
+        markers.push({ line: index, title: trimmed.replace(/^#{1,3}\s*/, "") });
+      }
+    });
+
+    if (markers.length >= 2) {
+      return markers.map((marker, index) => {
+        const endLine = markers[index + 1] ? markers[index + 1].line : lines.length;
+        return {
+          index: index + 1,
+          title: marker.title,
+          text: lines.slice(marker.line + 1, endLine).join("\n").trim(),
+          auto: false
+        };
+      }).filter((chapter) => chapter.text);
+    }
+
+    const size = 3500;
+    const chunks = [];
+    for (let offset = 0; offset < text.length; offset += size) {
+      chunks.push({
+        index: chunks.length + 1,
+        title: `自动分章 ${chunks.length + 1}`,
+        text: text.slice(offset, offset + size),
+        auto: true
+      });
+    }
+    return chunks;
+  }
+
+  function renderChapterList(chapters) {
+    if (!chapters.length) {
+      els.chapterList.innerHTML = '<li class="empty">导入文本后显示章节识别结果。</li>';
+      return;
+    }
+    els.chapterList.innerHTML = chapters.slice(0, 80).map((chapter) => {
+      const tag = chapter.auto ? '<span class="tag">自动</span>' : "";
+      return `<li><span>${escapeHtml(chapter.title)}</span>${tag}<small>${chapter.text.length} 字</small></li>`;
+    }).join("");
+  }
+
+  function renderWarnings(warnings) {
+    if (!warnings || !warnings.length) {
+      els.warningList.innerHTML = '<li class="ok">当前没有阻断性提醒。</li>';
+      return;
+    }
+    els.warningList.innerHTML = warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("");
+  }
+
+  function renderMemory(result) {
+    if (!result || !result.memory_snapshot) {
+      els.memoryList.innerHTML = '<li class="empty">生成后显示该 user/thread 的短期记忆与长期故事圣经。</li>';
+      return;
+    }
+
+    const memory = result.memory_snapshot;
+    const recent = (memory.short_term.recent_chapters || []).map((item) => `${item.chapter_id} ${item.title}`).join(" / ");
+    const longTerm = memory.long_term || {};
+    els.memoryList.innerHTML = [
+      `<li><strong>短期窗口</strong><span>${escapeHtml(recent || "无")}</span></li>`,
+      `<li><strong>长期事实</strong><span>${(longTerm.canon_facts || []).length} 条</span></li>`,
+      `<li><strong>人物/地点</strong><span>${Object.keys(longTerm.characters || {}).length} 人物 · ${Object.keys(longTerm.locations || {}).length} 地点</span></li>`,
+      `<li><strong>悬念线程</strong><span>${(longTerm.unresolved_threads || []).length} 条</span></li>`
+    ].join("");
+  }
+
+  function renderScenes(result) {
+    const episodes = result && result.script && result.script.script && result.script.script.episodes;
+    if (!episodes || !episodes.length) {
+      els.scenePreview.innerHTML = '<li class="empty">后端生成后显示前若干场戏预览。</li>';
+      return;
+    }
+
+    const scenes = episodes.flatMap((episode) => episode.acts || []).flatMap((act) => act.scenes || []).slice(0, 80);
+    els.scenePreview.innerHTML = scenes.map((scene) => {
+      return `<li>
+        <strong>${escapeHtml(scene.scene_id)} · ${escapeHtml(scene.title)}</strong>
+        <span>${escapeHtml(scene.slugline.location)} / ${escapeHtml(scene.slugline.time)} / ${escapeHtml(scene.purpose)}</span>
+        <small>人物：${escapeHtml((scene.characters || []).join(", ") || "待定")}</small>
+      </li>`;
+    }).join("");
+  }
+
+  function renderStats(stats) {
+    els.statsLine.textContent = `${stats.scene_count || 0} 场戏 · ${stats.character_count || 0} 人物 · ${stats.location_count || 0} 地点 · ${stats.model_call_count || 0} 次模型调用`;
+  }
+
+  function setStatus(message) {
+    els.statusText.textContent = message;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  init();
+})();
