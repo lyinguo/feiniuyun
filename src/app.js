@@ -100,6 +100,7 @@
   let currentEpubFolder = "";
   let isEpubMode = false;      
   let epubChapterCount = 0;
+  let streamActs = [];
   const promptState = { ...FORMAT_PROMPTS };
   let currentFormat = "web_series";
 
@@ -219,7 +220,7 @@
         const formData = new FormData();
         formData.append('file', file);
 
-        fetch('/api/parse-epub', { 
+        fetch(`${API_BASE}/api/parse-epub`, { 
             method: 'POST',
             body: formData
         })
@@ -250,12 +251,7 @@
                 }));
 
                 // 🌟 生成下拉菜单的内容，并让它显示出来
-                const optionsHtml = mappedChapters.map(ch => {
-                    // 我们把 file_path (如 "./chapter_001.txt") 存在 value 里
-                    // 我们把标题存在 option 标签中间显示
-                    const originalChapter = info.chapters.find(c => c.original_title === ch.title);
-                    return `<option value="${originalChapter.file_path}">${ch.title}</option>`;
-                }).join("");
+                const optionsHtml = buildChapterOptions(info.chapters || []);
                 
                 els.chapterSelect.innerHTML = '<option value="">-- 选择章节预览 --</option>' + optionsHtml;
                 els.chapterSelect.style.display = 'inline-block';
@@ -296,6 +292,19 @@
     } finally {
       event.target.value = "";
     }
+  }
+
+  function buildChapterOptions(chapters) {
+    return chapters.flatMap((chapter) => {
+      if (chapter.is_chunked && Array.isArray(chapter.chunks)) {
+        return chapter.chunks.map((chunk) => {
+          const label = `${chapter.original_title} · 分段 ${chunk.sub_index}`;
+          return `<option value="${escapeHtml(chunk.file_path)}">${escapeHtml(label)}</option>`;
+        });
+      }
+      if (!chapter.file_path) return [];
+      return [`<option value="${escapeHtml(chapter.file_path)}">${escapeHtml(chapter.original_title)}</option>`];
+    }).join("");
   }
 
   async function readNovelFile(file) {
@@ -376,6 +385,11 @@
   }
 
   async function convert() {
+    if (isEpubMode && currentEpubFolder) {
+      await convertProjectStream();
+      return;
+    }
+
     const payload = buildPayload();
     abortController = new AbortController();
     els.convertBtn.disabled = true;
@@ -415,6 +429,126 @@
     }
   }
 
+  async function convertProjectStream() {
+    const payload = buildProjectPayload();
+    abortController = new AbortController();
+    streamActs = [];
+    latestResult = null;
+    streamActs = [];
+    els.convertBtn.disabled = true;
+    els.copyBtn.disabled = true;
+    els.downloadBtn.disabled = true;
+    els.yamlOutput.value = "";
+    renderWarnings([]);
+    renderScenes({ manifest: { acts: [] } });
+    setStatus("正在按章节顺序流式生成全书剧情 ...");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/scripts/convert-project-stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: abortController.signal
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.detail || body.message || `HTTP ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error("浏览器没有返回可读取的流。");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.trim()) {
+            handleProjectStreamEvent(JSON.parse(line));
+          }
+        }
+      }
+
+      buffer += decoder.decode();
+      if (buffer.trim()) {
+        handleProjectStreamEvent(JSON.parse(buffer));
+      }
+    } catch (error) {
+      if (error.name === "AbortError") {
+        setStatus("全书生成请求已取消。");
+      } else {
+        setStatus(`全书生成失败：${error.message}`);
+        renderWarnings([error.message]);
+      }
+    } finally {
+      abortController = null;
+      queueParse();
+    }
+  }
+
+  function handleProjectStreamEvent(event) {
+    if (event.event === "error") {
+      throw new Error(event.message || "项目生成失败");
+    }
+
+    if (event.event === "start") {
+      els.yamlOutput.value = `项目：${event.book_title}\n输出目录：${event.output_dir}\n待处理分段：${event.unit_count}\n`;
+      setStatus(`开始生成全书：共 ${event.unit_count} 个章节/分段。`);
+      renderStats({
+        processed_unit_count: 0,
+        output_txt_count: 0,
+        scene_count: 0,
+        source_char_count: 0
+      });
+      return;
+    }
+
+    if (event.event === "unit_start") {
+      setStatus(`正在生成 ${event.unit_index}/${event.unit_count}：${event.chapter_title}`);
+      els.yamlOutput.value += `\n[开始] ${event.unit_index}/${event.unit_count} ${event.chapter_title}\n`;
+      els.yamlOutput.scrollTop = els.yamlOutput.scrollHeight;
+      return;
+    }
+
+    if (event.event === "unit_done") {
+      streamActs.push(event.act);
+      latestResult = {
+        manifest: {
+          acts: streamActs,
+          rolling_summary: event.rolling_summary || "",
+          global_characters: [],
+          global_settings: []
+        },
+        stats: event.stats || {}
+      };
+      els.yamlOutput.value += `\n===== ${event.act.txt_file} =====\n${event.plot_text || ""}\n`;
+      els.yamlOutput.scrollTop = els.yamlOutput.scrollHeight;
+      renderScenes(latestResult);
+      renderStats(event.stats || {});
+      setStatus(`已完成 ${event.unit_index}/${event.unit_count}：${event.act.txt_file}`);
+      return;
+    }
+
+    if (event.event === "done") {
+      latestResult = event.data;
+      els.copyBtn.disabled = !els.yamlOutput.value;
+      els.downloadBtn.disabled = !els.yamlOutput.value;
+      renderMemory(latestResult);
+      renderScenes(latestResult);
+      renderStats(latestResult.stats || {});
+      els.yamlOutput.value += `\n===== manifest.json =====\n${JSON.stringify(latestResult.manifest, null, 2)}\n`;
+      els.yamlOutput.scrollTop = els.yamlOutput.scrollHeight;
+      setStatus(`全书生成完成：${latestResult.manifest_path}`);
+    }
+  }
+
   function buildPayload() {
     const target = document.querySelector("[name='targetFormat']:checked");
     return {
@@ -430,24 +564,45 @@
     };
   }
 
+  function buildProjectPayload() {
+    const target = document.querySelector("[name='targetFormat']:checked");
+    const tone = els.toneInput.value.trim() || "现实感、强冲突、可拍摄";
+    const formatPrompt = els.formatPromptInput.value.trim();
+    return {
+      user_id: els.userIdInput.value.trim(),
+      thread_id: els.threadIdInput.value.trim(),
+      project_path: currentEpubFolder,
+      title: els.titleInput.value.trim() || null,
+      target_format: target ? target.value : "web_series",
+      adaptation_tone: [tone, formatPrompt].filter(Boolean).join("\n\n"),
+      scene_density: Number(els.densityRange.value),
+      short_term_window: Number(els.shortWindow.value),
+      max_chunk_chars: 12000,
+      max_retries: 2
+    };
+  }
+
   async function copyYaml() {
     if (!els.yamlOutput.value) return;
     await navigator.clipboard.writeText(els.yamlOutput.value);
-    setStatus("YAML 已复制到剪贴板。");
+    setStatus(latestResult && latestResult.manifest ? "全书输出已复制到剪贴板。" : "YAML 已复制到剪贴板。");
   }
 
   function downloadYaml() {
     if (!els.yamlOutput.value) return;
-    const blob = new Blob([els.yamlOutput.value], { type: "text/yaml;charset=utf-8" });
+    const isProjectOutput = latestResult && latestResult.manifest;
+    const blob = new Blob([els.yamlOutput.value], {
+      type: isProjectOutput ? "text/plain;charset=utf-8" : "text/yaml;charset=utf-8"
+    });
     const link = document.createElement("a");
     const title = (els.titleInput.value.trim() || "novel_script").replace(/[\\/:*?"<>|]/g, "_");
     link.href = URL.createObjectURL(blob);
-    link.download = `${title}.script.yaml`;
+    link.download = isProjectOutput ? `${title}.project_output.txt` : `${title}.script.yaml`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(link.href);
-    setStatus("YAML 文件已下载。");
+    setStatus(isProjectOutput ? "全书输出已下载。" : "YAML 文件已下载。");
   }
 
   function splitChapters(rawText) {
@@ -496,7 +651,8 @@
     }
     els.chapterList.innerHTML = chapters.slice(0, 80).map((chapter) => {
       const tag = chapter.auto ? '<span class="tag">自动</span>' : "";
-      return `<li><span>${escapeHtml(chapter.title)}</span>${tag}<small>${chapter.text.length} 字</small></li>`;
+      const length = typeof chapter.text === "string" ? chapter.text.length : Number((chapter.text && chapter.text.length) || chapter.char_count || 0);
+      return `<li><span>${escapeHtml(chapter.title)}</span>${tag}<small>${length} 字</small></li>`;
     }).join("");
   }
 
@@ -509,6 +665,17 @@
   }
 
   function renderMemory(result) {
+    if (result && result.manifest) {
+      const manifest = result.manifest;
+      els.memoryList.innerHTML = [
+        `<li><strong>输出目录</strong><span>${escapeHtml(result.output_dir || manifest.output_dir || "")}</span></li>`,
+        `<li><strong>滚动摘要</strong><span>${escapeHtml((manifest.rolling_summary || "无").slice(0, 180))}</span></li>`,
+        `<li><strong>人物/设定</strong><span>${(manifest.global_characters || []).length} 人物 · ${(manifest.global_settings || []).length} 设定</span></li>`,
+        `<li><strong>剧情文件</strong><span>${(manifest.acts || []).length} 个 txt · 1 个 manifest.json</span></li>`
+      ].join("");
+      return;
+    }
+
     if (!result || !result.memory_snapshot) {
       els.memoryList.innerHTML = '<li class="empty">生成后显示该 user/thread 的短期记忆与长期故事圣经。</li>';
       return;
@@ -526,6 +693,23 @@
   }
 
   function renderScenes(result) {
+    if (result && result.manifest && result.manifest.acts) {
+      const acts = result.manifest.acts.slice(0, 80);
+      if (!acts.length) {
+        els.scenePreview.innerHTML = '<li class="empty">全书生成后按章节显示剧情文件。</li>';
+        return;
+      }
+      els.scenePreview.innerHTML = acts.map((act) => {
+        const characters = (act.character_introductions || []).map((item) => item.name).filter(Boolean).join(", ");
+        return `<li>
+          <strong>${escapeHtml(act.act_id)} · ${escapeHtml(act.chapter_title)}</strong>
+          <span>${escapeHtml(act.txt_file)} / ${act.scene_count || 0} 场戏 / ${act.txt_char_count || 0} 字</span>
+          <small>人物：${escapeHtml(characters || "待定")}</small>
+        </li>`;
+      }).join("");
+      return;
+    }
+
     const episodes = result && result.script && result.script.script && result.script.script.episodes;
     if (!episodes || !episodes.length) {
       els.scenePreview.innerHTML = '<li class="empty">后端生成后显示前若干场戏预览。</li>';
@@ -543,6 +727,10 @@
   }
 
   function renderStats(stats) {
+    if (stats.processed_unit_count || stats.output_txt_count) {
+      els.statsLine.textContent = `${stats.processed_unit_count || 0} 分段 · ${stats.output_txt_count || 0} 剧情文件 · ${stats.scene_count || 0} 场戏 · ${stats.source_char_count || 0} 源字数`;
+      return;
+    }
     els.statsLine.textContent = `${stats.scene_count || 0} 场戏 · ${stats.character_count || 0} 人物 · ${stats.location_count || 0} 地点 · ${stats.model_call_count || 0} 次模型调用`;
   }
 

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.core.llm_client import LLMConfigurationError, LLMError
 from app.agent.script_graph.llm import GraphLLMConfigurationError
@@ -45,6 +48,29 @@ async def convert_project(request: ConvertProjectRequest) -> ApiResponse:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"project conversion failed: {exc}") from exc
+
+
+@router.post("/convert-project-stream")
+async def convert_project_stream(request: ConvertProjectRequest) -> StreamingResponse:
+    async def event_stream():
+        try:
+            async for event in script_project_service.stream_project_events(request):
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except (GraphLLMConfigurationError, ScriptProjectError) as exc:
+            yield json.dumps(
+                {"event": "error", "message": str(exc)},
+                ensure_ascii=False,
+            ) + "\n"
+        except Exception as exc:
+            yield json.dumps(
+                {"event": "error", "message": f"project conversion failed: {exc}"},
+                ensure_ascii=False,
+            ) + "\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson; charset=utf-8",
+    )
 
 
 @router.get("/memory/{user_id}/{thread_id}", response_model=ApiResponse)

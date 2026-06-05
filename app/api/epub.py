@@ -1,13 +1,14 @@
 from fastapi import APIRouter, UploadFile, File
 import shutil
 import os
-from app.services.epub_hand import process_epub_to_dataset # 引入你的函数
 
 router = APIRouter()
 
 @router.post("/parse-epub")
 async def parse_epub_endpoint(file: UploadFile = File(...)):
     try:
+        from app.services.epub_hand import process_epub_to_dataset # 引入你的函数
+
         # 1. 决定保存路径并保存上传的 epub
         base_dir = "data/temp_epubs"
         os.makedirs(base_dir, exist_ok=True)

@@ -79,6 +79,15 @@ class ScriptProjectService:
         return projects
 
     async def run_project(self, request: ConvertProjectRequest) -> dict[str, Any]:
+        final_data: dict[str, Any] | None = None
+        async for event in self.stream_project_events(request):
+            if event.get("event") == "done":
+                final_data = event["data"]
+        if final_data is None:
+            raise ScriptProjectError("项目生成没有产生最终结果。")
+        return final_data
+
+    async def stream_project_events(self, request: ConvertProjectRequest):
         project_dir = self._resolve_project_dir(request.project_path)
         metadata = self._read_json(project_dir / "metadata.json")
         book_title = request.title or metadata.get("book_title") or project_dir.name
@@ -88,6 +97,14 @@ class ScriptProjectService:
 
         output_dir = self._make_output_dir(request, book_title)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        yield {
+            "event": "start",
+            "book_title": book_title,
+            "project_path": request.project_path,
+            "unit_count": len(units),
+            "output_dir": str(output_dir.as_posix()),
+        }
 
         memory = memory_store.load(
             request.user_id,
@@ -101,6 +118,15 @@ class ScriptProjectService:
         acts: list[dict[str, Any]] = []
         total_scene_count = 0
         for unit in units:
+            yield {
+                "event": "unit_start",
+                "unit_index": unit.unit_index,
+                "unit_count": len(units),
+                "chapter_title": unit.display_title,
+                "source_file": unit.source_file,
+                "source_char_count": len(unit.text),
+            }
+
             result = await run_chapter(
                 Chapter(
                     index=unit.unit_index,
@@ -126,24 +152,37 @@ class ScriptProjectService:
 
             scene_count = len(script_data.get("scenes") or [])
             total_scene_count += scene_count
-            acts.append(
-                {
-                    "act_id": f"act_{unit.unit_index:04d}",
-                    "logical_chapter_index": unit.logical_index,
-                    "chapter_title": unit.logical_title,
-                    "source_file": unit.source_file,
-                    "source_part": unit.source_part,
-                    "source_part_count": unit.source_part_count,
-                    "txt_file": output_name,
-                    "txt_char_count": len(plot_text),
-                    "source_char_count": len(unit.text),
-                    "scene_count": scene_count,
-                    "character_introductions": self._character_introductions(script_data),
-                    "critic_warnings": result.get("critic_warnings", []),
-                    "error_msg": result.get("error_msg", ""),
-                    "retry_count": result.get("retry_count", 0),
-                }
-            )
+            act = {
+                "act_id": f"act_{unit.unit_index:04d}",
+                "logical_chapter_index": unit.logical_index,
+                "chapter_title": unit.logical_title,
+                "source_file": unit.source_file,
+                "source_part": unit.source_part,
+                "source_part_count": unit.source_part_count,
+                "txt_file": output_name,
+                "txt_char_count": len(plot_text),
+                "source_char_count": len(unit.text),
+                "scene_count": scene_count,
+                "character_introductions": self._character_introductions(script_data),
+                "critic_warnings": result.get("critic_warnings", []),
+                "error_msg": result.get("error_msg", ""),
+                "retry_count": result.get("retry_count", 0),
+            }
+            acts.append(act)
+            yield {
+                "event": "unit_done",
+                "unit_index": unit.unit_index,
+                "unit_count": len(units),
+                "act": act,
+                "plot_text": plot_text,
+                "rolling_summary": rolling_summary,
+                "stats": {
+                    "processed_unit_count": len(acts),
+                    "scene_count": total_scene_count,
+                    "source_char_count": sum(item["source_char_count"] for item in acts),
+                    "output_txt_count": len(acts),
+                },
+            }
 
         manifest = {
             "schema_version": "1.0",
@@ -181,7 +220,7 @@ class ScriptProjectService:
             acts=acts,
         )
 
-        return {
+        data = {
             "project": {
                 "book_title": book_title,
                 "project_path": request.project_path,
@@ -190,6 +229,10 @@ class ScriptProjectService:
             "manifest_path": str(manifest_path.as_posix()),
             "manifest": manifest,
             "stats": manifest["stats"],
+        }
+        yield {
+            "event": "done",
+            "data": data,
         }
 
     def _resolve_project_dir(self, value: str) -> Path:

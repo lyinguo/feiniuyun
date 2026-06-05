@@ -13,7 +13,7 @@ class ConvertNovelRequest(BaseModel):
     novel_text: str = Field(..., min_length=1, description="Novel manuscript text")
     title: Optional[str] = Field(default=None, max_length=120)
     target_format: Literal["web_series", "film", "stage", "audio_drama"] = "web_series"
-    adaptation_tone: str = Field(default="现实感、强冲突、可拍摄", max_length=200)
+    adaptation_tone: str = Field(default="现实感、强冲突、可拍摄", max_length=4000)
     scene_density: int = Field(default=3, ge=1, le=6)
     chapters_per_episode: int = Field(default=3, ge=1, le=20)
     short_term_window: int = Field(default=2, ge=1, le=8)
@@ -47,7 +47,7 @@ class ConvertProjectRequest(BaseModel):
     project_path: str = Field(..., min_length=1, description="Folder under data/temp_epubs")
     title: Optional[str] = Field(default=None, max_length=120)
     target_format: Literal["web_series", "film", "stage", "audio_drama"] = "web_series"
-    adaptation_tone: str = Field(default="现实感、强冲突、可拍摄", max_length=200)
+    adaptation_tone: str = Field(default="现实感、强冲突、可拍摄", max_length=4000)
     scene_density: int = Field(default=3, ge=1, le=6)
     short_term_window: int = Field(default=2, ge=1, le=8)
     max_chapters: Optional[int] = Field(default=None, ge=1, le=120)
