@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     enable_mcp_tools: bool = False
     mcp_config_path: str = ""
 
+    # Compatibility aliases. Many OpenAI-compatible examples use these names,
+    # while the reference framework uses dashscope_*.
+    openai_api_key: str = ""
+    openai_base_url: str = ""
+    dashscope_api_key: str = ""
+    dashscope_base_url: str = ""
+    dashscope_model: str = ""
+
     @field_validator("debug", "enable_mcp_tools", mode="before")
     @classmethod
     def parse_bool_like(cls, value):
@@ -71,6 +79,22 @@ class Settings(BaseSettings):
             }:
                 return False
         return value
+
+    @model_validator(mode="after")
+    def apply_provider_aliases(self):
+        fields = type(self).model_fields
+        default_base_url = fields["llm_base_url"].default
+
+        if not self.llm_api_key:
+            self.llm_api_key = self.openai_api_key or self.dashscope_api_key
+
+        if self.llm_base_url == default_base_url:
+            self.llm_base_url = self.openai_base_url or self.dashscope_base_url or self.llm_base_url
+
+        if self.llm_model == fields["llm_model"].default and self.dashscope_model:
+            self.llm_model = self.dashscope_model
+
+        return self
 
     @property
     def llm_configured(self) -> bool:
