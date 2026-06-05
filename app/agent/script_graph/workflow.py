@@ -8,8 +8,12 @@ from typing import Any, Iterable
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.script_graph.nodes import (
-    archivist_node,
+    background_node,
+    casting_node,
+    character_node,
     critic_node,
+    merge_prelude_node,
+    relationship_node,
     screenwriter_node,
     summarizer_node,
 )
@@ -18,7 +22,11 @@ from app.services.chapter_splitter import Chapter
 
 logger = logging.getLogger(__name__)
 
-ARCHIVIST = "archivist"
+BACKGROUND = "background"
+CHARACTER = "character"
+RELATIONSHIP = "relationship"
+CASTING = "casting"
+PRELUDE_MERGE = "prelude_merge"
 SCREENWRITER = "screenwriter"
 CRITIC = "critic"
 SUMMARIZER = "summarizer"
@@ -56,17 +64,32 @@ def route_after_critic(state: ScriptGraphState) -> str:
 
 
 def build_script_graph():
-    """Build and compile the LangGraph workflow."""
+    """Build and compile the LangGraph workflow.
+
+    The graph first fans out into lightweight analysis agents. Their outputs
+    are merged into the story archive, then the screenwriter drafts the chapter.
+    """
 
     graph = StateGraph(ScriptGraphState)
 
-    graph.add_node(ARCHIVIST, archivist_node)
+    graph.add_node(BACKGROUND, background_node)
+    graph.add_node(CHARACTER, character_node)
+    graph.add_node(RELATIONSHIP, relationship_node)
+    graph.add_node(CASTING, casting_node)
+    graph.add_node(PRELUDE_MERGE, merge_prelude_node)
     graph.add_node(SCREENWRITER, screenwriter_node)
     graph.add_node(CRITIC, critic_node)
     graph.add_node(SUMMARIZER, summarizer_node)
 
-    graph.add_edge(START, ARCHIVIST)
-    graph.add_edge(ARCHIVIST, SCREENWRITER)
+    graph.add_edge(START, BACKGROUND)
+    graph.add_edge(START, CHARACTER)
+    graph.add_edge(START, RELATIONSHIP)
+    graph.add_edge(START, CASTING)
+    graph.add_edge(BACKGROUND, PRELUDE_MERGE)
+    graph.add_edge(CHARACTER, PRELUDE_MERGE)
+    graph.add_edge(RELATIONSHIP, PRELUDE_MERGE)
+    graph.add_edge(CASTING, PRELUDE_MERGE)
+    graph.add_edge(PRELUDE_MERGE, SCREENWRITER)
     graph.add_edge(SCREENWRITER, CRITIC)
     graph.add_conditional_edges(
         CRITIC,
@@ -164,4 +187,3 @@ async def run_chapters(
         "global_settings": global_settings,
         "chapters": chapter_results,
     }
-

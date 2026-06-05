@@ -5,13 +5,20 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.core.llm_client import LLMConfigurationError, LLMError
-from app.models.request import ClearMemoryRequest, ConvertNovelRequest
+from app.agent.script_graph.llm import GraphLLMConfigurationError
+from app.models.request import ClearMemoryRequest, ConvertNovelRequest, ConvertProjectRequest
 from app.models.response import ApiResponse, ConvertNovelData
 from app.services.adaptation_service import AdaptationError, novel_adaptation_service
 from app.services.memory_store import memory_store
+from app.services.script_project_service import ScriptProjectError, script_project_service
 from app.config import settings
 
 router = APIRouter(prefix="/api/scripts")
+
+
+@router.get("/projects", response_model=ApiResponse)
+async def list_projects() -> ApiResponse:
+    return ApiResponse(data={"projects": script_project_service.list_projects()})
 
 
 @router.post("/convert", response_model=ApiResponse)
@@ -25,6 +32,19 @@ async def convert_novel(request: ConvertNovelRequest) -> ApiResponse:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"conversion failed: {exc}") from exc
+
+
+@router.post("/convert-project", response_model=ApiResponse)
+async def convert_project(request: ConvertProjectRequest) -> ApiResponse:
+    try:
+        data = await script_project_service.run_project(request)
+        return ApiResponse(data=data)
+    except GraphLLMConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ScriptProjectError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"project conversion failed: {exc}") from exc
 
 
 @router.get("/memory/{user_id}/{thread_id}", response_model=ApiResponse)

@@ -27,6 +27,10 @@ class ScriptGraphState(TypedDict):
     chapter_title: str
     current_script_data: dict[str, Any]
     archivist_notes: dict[str, Any]
+    background_notes: dict[str, Any]
+    character_notes: dict[str, Any]
+    relationship_notes: dict[str, Any]
+    casting_notes: dict[str, Any]
     critic_warnings: list[str]
     max_retries: int
     scene_density: int
@@ -57,6 +61,10 @@ def initial_script_graph_state(
         "chapter_title": chapter_title,
         "current_script_data": {},
         "archivist_notes": {},
+        "background_notes": {},
+        "character_notes": {},
+        "relationship_notes": {},
+        "casting_notes": {},
         "critic_warnings": [],
         "max_retries": max_retries,
         "scene_density": scene_density,

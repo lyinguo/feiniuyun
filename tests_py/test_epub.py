@@ -1,8 +1,13 @@
 import os
 import json
 import re
-import ebooklib
-from ebooklib import epub
+import unittest
+
+try:
+    import ebooklib
+    from ebooklib import epub
+except ModuleNotFoundError as exc:
+    raise unittest.SkipTest("ebooklib is not installed") from exc
 from bs4 import BeautifulSoup
 
 # 配置项：字符到 Token 的估算乘数
