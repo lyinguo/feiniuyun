@@ -52,7 +52,8 @@ class OpenAICompatibleLLMClient:
     ) -> str:
         if not self.settings.llm_configured:
             raise LLMConfigurationError(
-                "LLM_API_KEY is not configured. Set it in .env before converting novels."
+                "LLM_API_KEY is not configured. Set LLM_API_KEY, OPENAI_API_KEY, "
+                "or DASHSCOPE_API_KEY in .env before converting novels."
             )
 
         try:

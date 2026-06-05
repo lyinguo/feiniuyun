@@ -34,7 +34,15 @@ LLM_MODEL=qwen-max
 LLM_API_KEY=你的真实 API Key
 ```
 
-如果没有 `LLM_API_KEY`，后端会返回配置错误，不会用假数据伪装生成成功。
+也兼容 OpenAI-compatible 常见变量名：
+
+```text
+OPENAI_BASE_URL=https://api.siliconflow.cn/v1
+OPENAI_API_KEY=你的真实 API Key
+LLM_MODEL=MiniMaxAI/MiniMax-M2.5
+```
+
+如果没有 `LLM_API_KEY`、`OPENAI_API_KEY` 或 `DASHSCOPE_API_KEY`，后端会返回配置错误，不会用假数据伪装生成成功。
 
 ## 启动
 

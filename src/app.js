@@ -126,14 +126,63 @@
     if (!file) return;
     setStatus(`正在读取 ${file.name} ...`);
     try {
-      els.novelInput.value = await file.text();
-      setStatus(`已导入 ${file.name}。`);
+      const result = await readNovelFile(file);
+      els.novelInput.value = result.text;
+      setStatus(`已导入小说：${file.name}${result.encoding ? `（${result.encoding}）` : ""}。`);
       queueParse();
     } catch (error) {
       setStatus(`文件读取失败：${error.message}`);
     } finally {
       event.target.value = "";
     }
+  }
+
+  async function readNovelFile(file) {
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    if (!bytes.length) return { text: "", encoding: "empty" };
+
+    const utf8 = tryDecode(bytes, "utf-8", true);
+    if (utf8.ok) return { text: stripBom(utf8.text), encoding: "utf-8" };
+
+    const fallbackEncodings = ["gb18030", "gbk", "big5"];
+    let best = null;
+    fallbackEncodings.forEach((encoding) => {
+      const decoded = tryDecode(bytes, encoding, false);
+      if (!decoded.ok) return;
+      const score = scoreDecodedText(decoded.text);
+      if (!best || score > best.score) {
+        best = { text: decoded.text, encoding, score };
+      }
+    });
+
+    if (best) return { text: stripBom(best.text), encoding: best.encoding };
+
+    const fallback = new TextDecoder("utf-8").decode(bytes);
+    return { text: stripBom(fallback), encoding: "utf-8 fallback" };
+  }
+
+  function tryDecode(bytes, encoding, fatal) {
+    try {
+      return {
+        ok: true,
+        text: new TextDecoder(encoding, { fatal }).decode(bytes)
+      };
+    } catch (_) {
+      return { ok: false, text: "" };
+    }
+  }
+
+  function scoreDecodedText(text) {
+    const sample = text.slice(0, 5000);
+    const chinese = (sample.match(/[\u4e00-\u9fff]/g) || []).length;
+    const replacement = (sample.match(/\uFFFD/g) || []).length;
+    const controls = (sample.match(/[\x00-\x08\x0E-\x1F]/g) || []).length;
+    return chinese * 3 - replacement * 20 - controls * 10 + Math.min(sample.length, 500);
+  }
+
+  function stripBom(text) {
+    return String(text || "").replace(/^\uFEFF/, "");
   }
 
   function loadSample() {
@@ -272,7 +321,7 @@
 
   function renderChapterList(chapters) {
     if (!chapters.length) {
-      els.chapterList.innerHTML = '<li class="empty">导入文本后显示章节识别结果。</li>';
+      els.chapterList.innerHTML = '<li class="empty">导入小说后显示章节识别结果。</li>';
       return;
     }
     els.chapterList.innerHTML = chapters.slice(0, 80).map((chapter) => {
