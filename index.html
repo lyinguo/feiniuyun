@@ -6,6 +6,7 @@
     <title>AI 小说转剧本工具</title>
     <link rel="stylesheet" href="styles.css">
     <script src="src/app.js" defer></script>
+    <script src="src/app.js?v=2" defer></script>
   </head>
   <body>
     <main class="app-shell">
@@ -32,6 +33,10 @@
             <input id="fileInput" type="file" accept=".txt,.text,.md,.epub,.markdown,.csv,.json,.jsonl,.yaml,.yml,.xml,.html,.htm,.rtf,.log,.srt,.ass,.ssa,.vtt,.tex,.ini,.conf,.cfg,text/*,application/epub+zip,application/json,application/x-ndjson,application/yaml,application/xml,text/rtf">
             <button id="sampleBtn" class="button secondary" type="button">载入示例</button>
             <button id="clearBtn" class="button ghost" type="button">清空</button>
+
+            <select id="chapterSelect" style="display: none; margin-left: 10px; max-width: 200px; padding: 4px; border-radius: 4px;">
+                <option value="">-- 选择章节预览 --</option>
+            </select>
           </div>
 
           <textarea

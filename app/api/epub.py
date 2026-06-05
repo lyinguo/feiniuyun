@@ -27,8 +27,31 @@ async def parse_epub_endpoint(file: UploadFile = File(...)):
         return {
             "status": "success", 
             "message": "EPUB解析与拆分完成",
-            "data": book_metadata # 前端可以通过 response.data.book_title 拿到书名等
+            "data": book_metadata, # 前端可以通过 response.data.book_title 拿到书名等
+            "folder_name": folder_name
         }
 
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.get("/get-chapter")
+async def get_chapter_endpoint(folder: str, file_name: str):
+    try:
+        # 防御性编程：防止路径穿越漏洞
+        if ".." in folder or ".." in file_name:
+            return {"status": "error", "message": "非法路径"}
+            
+        # file_name 前端传过来可能是 "./chapter_001.txt"，把 "./" 去掉
+        clean_file_name = file_name.replace("./", "")
+        
+        file_path = os.path.join("data/temp_epubs", folder, clean_file_name)
+        
+        if not os.path.exists(file_path):
+            return {"status": "error", "message": "未找到该章节的文本文件"}
+            
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        return {"status": "success", "content": content}
     except Exception as e:
         return {"status": "error", "message": str(e)}
