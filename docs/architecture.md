@@ -37,6 +37,14 @@ Services app/services
 Tools app/tools
   - schema_tool.py：把 YAML Schema 要点注入模型上下文
   - text_stats_tool.py：章节规模和对白密度统计
+
+Agent app/agent/script_graph
+  - schemas.py：多 Agent 结构化输出 Schema
+  - state.py：LangGraph 全局 State
+  - prompts.py：Archivist/Screenwriter/Critic/Summarizer 角色 Prompt
+  - nodes.py：四个 Agent 节点实现
+  - workflow.py：StateGraph 节点和条件边编排
+  - demo.py：按章节喂入图的外部循环 Demo
 ```
 
 ## 长小说怎么处理
@@ -63,6 +71,29 @@ Tools app/tools
 2. 失败时可以定位到具体章节。
 3. 人物、地点、伏笔由长期记忆保存，不依赖模型每次“记住全部”。
 4. 短期记忆只保留最近 N 章，控制提示词长度。
+
+## LangGraph 多 Agent 流程
+
+当前项目新增了非线性多 Agent 工作流：
+
+```text
+START
+  -> Archivist
+  -> Screenwriter
+  -> Critic
+       -> failed && retry_count < max_retries: Screenwriter
+       -> passed or retry exhausted: Summarizer
+  -> END
+```
+
+节点职责：
+
+- `Archivist`：读取当前章节，更新 `global_characters` 和 `global_settings`。
+- `Screenwriter`：读取当前章节、`rolling_summary` 和全局档案，使用 `with_structured_output(ChapterScriptOutput)` 生成剧本。
+- `Critic`：程序化校验加 LLM 审查；失败时写入 `error_msg` 并增加 `retry_count`。
+- `Summarizer`：结合旧总结和当前剧本更新 `rolling_summary`。
+
+外部章节循环在 `workflow.run_chapters` 中实现。它逐章运行图，并把上一章输出的 `rolling_summary`、人物档案和设定档案传给下一章。
 
 ## 短期记忆
 
