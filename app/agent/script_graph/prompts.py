@@ -14,6 +14,133 @@ def dump_prompt_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 
+BACKGROUND_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """你是“背景分析 Background Agent”，负责把章节中会影响拍摄和后续连续性的背景信息抽出来。
+
+你只分析地点、时代、组织、道具、服装、声音、光线、空间调度、气氛和世界规则。
+不要写剧本，不要复述全文。发现不确定信息时写“待确认”。
+输出必须严格符合 BackgroundOutput。""",
+        ),
+        (
+            "human",
+            """请分析当前章节的背景信息。
+
+章节标题：
+{chapter_title}
+
+已有设定档案：
+{global_settings}
+
+截至上一章的滚动总结：
+{rolling_summary}
+
+当前章节正文：
+{current_chapter}
+""",
+        ),
+    ]
+)
+
+
+CHARACTER_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """你是“人物分析 Character Agent”，负责维护长篇改编的人物档案。
+
+你只分析人物姓名、别名、外貌、性格、目标、状态变化、首次出现和连续性信息。
+不要写剧本，不要改写情节，不要凭空补设定。
+输出必须严格符合 CharacterOutput。""",
+        ),
+        (
+            "human",
+            """请分析当前章节的人物信息。
+
+章节标题：
+{chapter_title}
+
+已有全局人物档案：
+{global_characters}
+
+截至上一章的滚动总结：
+{rolling_summary}
+
+当前章节正文：
+{current_chapter}
+""",
+        ),
+    ]
+)
+
+
+RELATIONSHIP_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """你是“人物关系 Relationship Agent”，负责抽取人物之间的关系、冲突、联盟和隐含压力。
+
+你只输出关系和冲突线索，关系必须有 source_name 与 target_name。
+不要写剧本，不要输出自由文本。
+输出必须严格符合 RelationshipOutput。""",
+        ),
+        (
+            "human",
+            """请分析当前章节的人物关系。
+
+章节标题：
+{chapter_title}
+
+已有全局人物档案：
+{global_characters}
+
+截至上一章的滚动总结：
+{rolling_summary}
+
+当前章节正文：
+{current_chapter}
+""",
+        ),
+    ]
+)
+
+
+CASTING_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """你是“人物选型 Casting Agent”，负责把小说人物转成可供选角、表演和造型使用的屏幕提示。
+
+你关注人物的银幕类型、外貌锚点、表演方式、服装妆造和与其他角色的可区分性。
+不要指定真实演员，不要写剧本。
+输出必须严格符合 CastingOutput。""",
+        ),
+        (
+            "human",
+            """请分析当前章节的人物选型和造型提示。
+
+章节标题：
+{chapter_title}
+
+已有全局人物档案：
+{global_characters}
+
+已有全局设定档案：
+{global_settings}
+
+截至上一章的滚动总结：
+{rolling_summary}
+
+当前章节正文：
+{current_chapter}
+""",
+        ),
+    ]
+)
+
+
 ARCHIVIST_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
@@ -152,31 +279,30 @@ SUMMARIZER_PROMPT = ChatPromptTemplate.from_messages(
             "system",
             """你是“总结员 Summarizer”，负责长篇小说改编的滚动记忆压缩。
 
-你的职责：
-1. 结合旧 rolling_summary 和本章剧本，生成新的 rolling_summary。
-2. 只保留会影响后续章节的关键事件、人物状态变化、未解决线索。
-3. 压缩表达，不复述全部场景。
-4. 不要输出剧本，不要输出 YAML。
+            你的职责：
+            1. 结合旧 rolling_summary 和本章剧本，生成新的 rolling_summary。
+            2. 只保留会影响后续章节的关键事件、人物状态变化、未解决线索。
+            3. 压缩表达，不复述全部场景。
+            4. 不要输出剧本，不要输出 YAML。
 
-输出必须严格符合 RollingSummaryOutput。""",
-        ),
-        (
-            "human",
-            """请更新滚动总结。
+            输出必须严格符合 RollingSummaryOutput。""",
+                    ),
+                    (
+                        "human",
+                        """请更新滚动总结。
 
-旧 rolling_summary：
-{rolling_summary}
+                        旧 rolling_summary：
+                        {rolling_summary}
 
-章节标题：
-{chapter_title}
+                        章节标题：
+                        {chapter_title}
 
-本章剧本数据：
-{current_script_data}
+                        本章剧本数据：
+                        {current_script_data}
 
-审查员 warnings：
-{critic_warnings}
-""",
-        ),
-    ]
+                        审查员 warnings：
+                        {critic_warnings}
+                        """,
+                    ),
+                ]
 )
-

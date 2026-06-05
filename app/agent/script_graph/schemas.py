@@ -69,6 +69,63 @@ class CanonFact(StrictModel):
     confidence: Literal["high", "medium", "low"] = "medium"
 
 
+class BackgroundOutput(StrictModel):
+    """Parallel pre-analysis focused on setting, period, props, and atmosphere."""
+
+    new_settings: list[GlobalSettingProfile] = Field(default_factory=list)
+    updated_settings: list[GlobalSettingProfile] = Field(default_factory=list)
+    canon_facts: list[CanonFact] = Field(default_factory=list)
+    atmosphere_notes: list[str] = Field(default_factory=list)
+    visual_motifs: list[str] = Field(default_factory=list)
+    continuity_risks: list[str] = Field(default_factory=list)
+
+
+class CharacterOutput(StrictModel):
+    """Parallel pre-analysis focused on characters."""
+
+    new_characters: list[GlobalCharacterProfile] = Field(default_factory=list)
+    updated_characters: list[GlobalCharacterProfile] = Field(default_factory=list)
+    character_observations: list[str] = Field(default_factory=list)
+    continuity_risks: list[str] = Field(default_factory=list)
+
+
+class RelationshipEntry(StrictModel):
+    """A directed relationship or conflict found in the chapter."""
+
+    source_name: str = Field(..., min_length=1)
+    target_name: str = Field(..., min_length=1)
+    relation: str = Field(..., min_length=1)
+    evidence: str = Field(default="")
+
+
+class RelationshipOutput(StrictModel):
+    """Parallel pre-analysis focused on relationships and conflict lines."""
+
+    relationships: list[RelationshipEntry] = Field(default_factory=list)
+    conflict_lines: list[str] = Field(default_factory=list)
+    alliance_lines: list[str] = Field(default_factory=list)
+    continuity_risks: list[str] = Field(default_factory=list)
+
+
+class CastingChoice(StrictModel):
+    """Screen-facing character design guidance for production and casting."""
+
+    character_name: str = Field(..., min_length=1)
+    screen_type: str = Field(default="待确认")
+    appearance_anchor: str = Field(default="")
+    performance_notes: list[str] = Field(default_factory=list)
+    costume_or_makeup: list[str] = Field(default_factory=list)
+    evidence: str = Field(default="")
+
+
+class CastingOutput(StrictModel):
+    """Parallel pre-analysis focused on casting, styling, and playable traits."""
+
+    choices: list[CastingChoice] = Field(default_factory=list)
+    ensemble_notes: list[str] = Field(default_factory=list)
+    continuity_risks: list[str] = Field(default_factory=list)
+
+
 class ArchivistOutput(StrictModel):
     """Structured output of the Archivist node."""
 
@@ -188,4 +245,3 @@ class RollingSummaryOutput(StrictModel):
     key_events: list[str] = Field(default_factory=list)
     open_threads: list[str] = Field(default_factory=list)
     character_state_changes: list[str] = Field(default_factory=list)
-

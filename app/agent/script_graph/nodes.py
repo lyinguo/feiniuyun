@@ -11,21 +11,193 @@ from app.agent.script_graph.llm import create_structured_llm
 from app.agent.script_graph.memory_ops import compact_for_prompt, merge_archivist_output
 from app.agent.script_graph.prompts import (
     ARCHIVIST_PROMPT,
+    BACKGROUND_PROMPT,
+    CASTING_PROMPT,
+    CHARACTER_PROMPT,
     CRITIC_PROMPT,
+    RELATIONSHIP_PROMPT,
     SCREENWRITER_PROMPT,
     SUMMARIZER_PROMPT,
     dump_prompt_json,
 )
 from app.agent.script_graph.schemas import (
     ArchivistOutput,
+    BackgroundOutput,
+    CastingOutput,
+    CharacterOutput,
     ChapterScriptOutput,
     CriticOutput,
+    GlobalCharacterProfile,
+    RelationshipOutput,
+    RelationshipProfile,
     RollingSummaryOutput,
 )
 from app.agent.script_graph.state import ScriptGraphState
 from app.services.yaml_builder import to_yaml
 
 logger = logging.getLogger(__name__)
+
+
+async def background_node(state: ScriptGraphState) -> dict[str, Any]:
+    """Extract screen-facing background, setting, and atmosphere notes."""
+
+    logger.info("[Background] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
+    chain = BACKGROUND_PROMPT | create_structured_llm(BackgroundOutput, temperature=0.1)
+    output: BackgroundOutput = await chain.ainvoke(
+        {
+            "chapter_title": state.get("chapter_title", ""),
+            "current_chapter": state["current_chapter"],
+            "rolling_summary": state.get("rolling_summary", ""),
+            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
+        }
+    )
+    logger.info(
+        "[Background] done settings=%d facts=%d",
+        len(output.new_settings) + len(output.updated_settings),
+        len(output.canon_facts),
+    )
+    return {"background_notes": output.model_dump()}
+
+
+async def character_node(state: ScriptGraphState) -> dict[str, Any]:
+    """Extract character archive updates before screenplay generation."""
+
+    logger.info("[Character] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
+    chain = CHARACTER_PROMPT | create_structured_llm(CharacterOutput, temperature=0.1)
+    output: CharacterOutput = await chain.ainvoke(
+        {
+            "chapter_title": state.get("chapter_title", ""),
+            "current_chapter": state["current_chapter"],
+            "rolling_summary": state.get("rolling_summary", ""),
+            "global_characters": dump_prompt_json(
+                compact_for_prompt(state.get("global_characters", []))
+            ),
+        }
+    )
+    logger.info(
+        "[Character] done characters=%d",
+        len(output.new_characters) + len(output.updated_characters),
+    )
+    return {"character_notes": output.model_dump()}
+
+
+async def relationship_node(state: ScriptGraphState) -> dict[str, Any]:
+    """Extract relationship and conflict lines in parallel with other analysis."""
+
+    logger.info("[Relationship] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
+    chain = RELATIONSHIP_PROMPT | create_structured_llm(RelationshipOutput, temperature=0.1)
+    output: RelationshipOutput = await chain.ainvoke(
+        {
+            "chapter_title": state.get("chapter_title", ""),
+            "current_chapter": state["current_chapter"],
+            "rolling_summary": state.get("rolling_summary", ""),
+            "global_characters": dump_prompt_json(
+                compact_for_prompt(state.get("global_characters", []))
+            ),
+        }
+    )
+    logger.info("[Relationship] done relationships=%d", len(output.relationships))
+    return {"relationship_notes": output.model_dump()}
+
+
+async def casting_node(state: ScriptGraphState) -> dict[str, Any]:
+    """Extract casting, styling, and playable trait notes."""
+
+    logger.info("[Casting] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
+    chain = CASTING_PROMPT | create_structured_llm(CastingOutput, temperature=0.15)
+    output: CastingOutput = await chain.ainvoke(
+        {
+            "chapter_title": state.get("chapter_title", ""),
+            "current_chapter": state["current_chapter"],
+            "rolling_summary": state.get("rolling_summary", ""),
+            "global_characters": dump_prompt_json(
+                compact_for_prompt(state.get("global_characters", []))
+            ),
+            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
+        }
+    )
+    logger.info("[Casting] done choices=%d", len(output.choices))
+    return {"casting_notes": output.model_dump()}
+
+
+async def merge_prelude_node(state: ScriptGraphState) -> dict[str, Any]:
+    """Merge parallel pre-analysis into global archives for the screenwriter."""
+
+    background = BackgroundOutput.model_validate(state.get("background_notes") or {})
+    characters = CharacterOutput.model_validate(state.get("character_notes") or {})
+    relationships = RelationshipOutput.model_validate(state.get("relationship_notes") or {})
+    casting = CastingOutput.model_validate(state.get("casting_notes") or {})
+
+    relationship_profiles = [
+        GlobalCharacterProfile(
+            name=item.source_name,
+            relationships=[
+                RelationshipProfile(
+                    target_name=item.target_name,
+                    relation=item.relation,
+                    evidence=item.evidence,
+                )
+            ],
+            first_seen_chapter=state.get("chapter_title", ""),
+            continuity_notes=[f"关系线索：{item.relation}"],
+        )
+        for item in relationships.relationships
+    ]
+
+    casting_profiles = [
+        GlobalCharacterProfile(
+            name=item.character_name,
+            appearance=item.appearance_anchor or item.screen_type,
+            first_seen_chapter=state.get("chapter_title", ""),
+            continuity_notes=[
+                *item.performance_notes,
+                *item.costume_or_makeup,
+            ],
+        )
+        for item in casting.choices
+    ]
+
+    archivist_output = ArchivistOutput(
+        new_characters=characters.new_characters,
+        updated_characters=[
+            *characters.updated_characters,
+            *relationship_profiles,
+            *casting_profiles,
+        ],
+        new_settings=background.new_settings,
+        updated_settings=background.updated_settings,
+        canon_facts=background.canon_facts,
+        continuity_risks=[
+            *background.continuity_risks,
+            *characters.continuity_risks,
+            *relationships.continuity_risks,
+            *casting.continuity_risks,
+        ],
+    )
+    merged_characters, merged_settings, notes = merge_archivist_output(
+        global_characters=state.get("global_characters", []),
+        global_settings=state.get("global_settings", []),
+        archivist_output=archivist_output,
+    )
+    notes.update(
+        {
+            "background": background.model_dump(),
+            "characters": characters.model_dump(),
+            "relationships": relationships.model_dump(),
+            "casting": casting.model_dump(),
+        }
+    )
+
+    logger.info(
+        "[PreludeMerge] done characters=%d settings=%d",
+        len(merged_characters),
+        len(merged_settings),
+    )
+    return {
+        "global_characters": merged_characters,
+        "global_settings": merged_settings,
+        "archivist_notes": notes,
+    }
 
 
 async def archivist_node(state: ScriptGraphState) -> dict[str, Any]:
@@ -245,4 +417,3 @@ def _deterministic_script_check(state: ScriptGraphState) -> dict[str, Any]:
         "error_msg": "",
         "warnings": warnings,
     }
-
