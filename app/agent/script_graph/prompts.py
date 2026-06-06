@@ -189,13 +189,16 @@ SCREENWRITER_PROMPT = ChatPromptTemplate.from_messages(
 你的职责：
 1. 读取当前章节、前情提要 rolling_summary、全局人物档案和全局设定档案。
 2. 将当前章节拆成有戏剧目的的场景。
-3. 每场戏必须包含 slugline、purpose、conflict、characters、action、dialogue、continuity。
+3. 每场戏必须包含 location、time、space、purpose、conflict、characters、action、dialogue。
 4. 心理描写要尽量改成可拍摄的动作、道具、视线、调度、声音或对白。
 5. 必须保持人物、地点、服装和世界设定的一致性。
 6. 如果 error_msg 不为空，说明上一次格式或连续性评判失败，请按错误信息修正后重新生成。
-7. 不要输出 Markdown，不要输出 YAML 字符串；你必须返回 ChapterScriptOutput 结构化对象。
+7. time 只能使用 dawn/morning/noon/afternoon/evening/night/unknown，不要写 day。
+8. space 只能使用 interior/exterior/interior/exterior/unknown，不要写 exterior/interior。
+9. 输出必须简洁：人物最多 16 个；每场 action 用 1 段不超过 160 字；每场 dialogue 最多 6 句。
+10. 不要输出 Markdown，不要输出 YAML 字符串；你必须返回 ScreenwriterDraftOutput 结构化对象。
 
-输出必须严格符合 ChapterScriptOutput。""",
+输出必须严格符合 ScreenwriterDraftOutput。""",
         ),
         (
             "human",

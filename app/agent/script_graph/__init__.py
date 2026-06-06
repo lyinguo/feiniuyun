@@ -12,6 +12,7 @@ from app.agent.script_graph.schemas import (
     GlobalSettingProfile,
     RelationshipOutput,
     RollingSummaryOutput,
+    ScreenwriterDraftOutput,
 )
 from app.agent.script_graph.state import ScriptGraphState, initial_script_graph_state
 from app.agent.script_graph.nodes import (
@@ -46,6 +47,7 @@ __all__ = [
     "GlobalCharacterProfile",
     "GlobalSettingProfile",
     "RollingSummaryOutput",
+    "ScreenwriterDraftOutput",
     "ScriptGraphState",
     "initial_script_graph_state",
     "archivist_node",

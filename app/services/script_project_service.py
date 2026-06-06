@@ -12,7 +12,7 @@ from typing import Any
 from app.agent.script_graph.workflow import load_template_schema, run_chapter
 from app.models.request import ConvertProjectRequest
 from app.services.chapter_splitter import Chapter
-from app.services.memory_store import memory_store, safe_component
+from app.services.memory_store import memory_store, new_memory, safe_component
 
 
 class ScriptProjectError(RuntimeError):
@@ -111,6 +111,14 @@ class ScriptProjectService:
             request.thread_id,
             request.short_term_window,
         )
+        if self._memory_has_content(memory) and memory.get("book_title") != book_title:
+            memory = new_memory(
+                request.user_id,
+                request.thread_id,
+                request.short_term_window,
+            )
+        memory["book_title"] = book_title
+        memory.setdefault("long_term", {})["book_title"] = book_title
         rolling_summary = self._seed_rolling_summary(memory)
         global_characters = self._seed_records(memory, "characters")
         global_settings = self._seed_records(memory, "locations")
@@ -399,6 +407,19 @@ class ScriptProjectService:
         return "\n".join(item for item in lines if item)
 
     @staticmethod
+    def _memory_has_content(memory: dict[str, Any]) -> bool:
+        long_term = memory.get("long_term", {})
+        short_term = memory.get("short_term", {})
+        return bool(
+            long_term.get("logline")
+            or long_term.get("characters")
+            or long_term.get("locations")
+            or long_term.get("canon_facts")
+            or long_term.get("unresolved_threads")
+            or short_term.get("recent_chapters")
+        )
+
+    @staticmethod
     def _seed_records(memory: dict[str, Any], key: str) -> list[dict[str, Any]]:
         raw = memory.get("long_term", {}).get(key, {})
         if isinstance(raw, dict):
@@ -503,6 +524,7 @@ class ScriptProjectService:
         acts: list[dict[str, Any]],
     ) -> None:
         memory.setdefault("short_term", {})["window_chapters"] = request.short_term_window
+        memory["book_title"] = memory.get("book_title") or ""
         memory["short_term"]["recent_chapters"] = [
             {
                 "chapter_id": item["act_id"],
@@ -518,6 +540,7 @@ class ScriptProjectService:
             for item in acts[-request.short_term_window :]
         ]
         long_term = memory.setdefault("long_term", {})
+        long_term["book_title"] = memory.get("book_title") or ""
         long_term["logline"] = rolling_summary[:500]
         long_term["characters"] = {
             f"char_{index:04d}": item for index, item in enumerate(global_characters, start=1)

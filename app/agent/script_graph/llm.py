@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.config import settings
 from app.services.llm_output_parser import parse_json_object
@@ -25,7 +25,7 @@ class GraphLLMResponseError(RuntimeError):
     """Raised when a graph LLM call cannot be parsed into the requested schema."""
 
 
-def create_chat_llm(*, temperature: float | None = None):
+def create_chat_llm(*, temperature: float | None = None, max_tokens: int | None = None):
     """Create a LangChain chat model for the graph agents.
 
     The project uses OpenAI-compatible providers, so DashScope, SiliconFlow,
@@ -52,14 +52,20 @@ def create_chat_llm(*, temperature: float | None = None):
         temperature=settings.llm_temperature if temperature is None else temperature,
         timeout=settings.llm_timeout_seconds,
         max_retries=settings.llm_max_retries,
+        max_tokens=max_tokens or settings.llm_max_tokens,
     )
 
 
-def create_structured_llm(schema: type[StructuredModel], *, temperature: float | None = None):
+def create_structured_llm(
+    schema: type[StructuredModel],
+    *,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+):
     """Create an LLM bound to a Pydantic structured-output schema."""
 
     method = _structured_output_method()
-    return create_chat_llm(temperature=temperature).with_structured_output(
+    return create_chat_llm(temperature=temperature, max_tokens=max_tokens).with_structured_output(
         schema,
         method=method,
     )
@@ -71,6 +77,7 @@ async def invoke_structured(
     values: dict[str, Any],
     *,
     temperature: float | None = None,
+    max_tokens: int | None = None,
 ) -> StructuredModel:
     """Invoke a prompt and return a validated Pydantic object.
 
@@ -82,15 +89,14 @@ async def invoke_structured(
     """
 
     try:
-        chain = prompt | create_structured_llm(schema, temperature=temperature)
-        output = await chain.ainvoke(values)
-        if output is None:
-            raise GraphLLMResponseError(
-                f"{schema.__name__} structured output parser returned None."
-            )
-        if isinstance(output, schema):
-            return output
-        return schema.model_validate(output)
+        output = await _invoke_structured_with_raw(
+            prompt,
+            schema,
+            values,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return output
     except Exception as exc:
         if _should_retry_as_plain_json(exc):
             logger.warning(
@@ -103,9 +109,56 @@ async def invoke_structured(
                 schema,
                 values,
                 temperature=temperature,
+                max_tokens=max_tokens,
                 original_error=exc,
             )
         raise
+
+
+async def _invoke_structured_with_raw(
+    prompt: ChatPromptTemplate,
+    schema: type[StructuredModel],
+    values: dict[str, Any],
+    *,
+    temperature: float | None,
+    max_tokens: int | None,
+) -> StructuredModel:
+    llm = create_chat_llm(temperature=temperature, max_tokens=max_tokens).with_structured_output(
+        schema,
+        method=_structured_output_method(),
+        include_raw=True,
+    )
+    result = await (prompt | llm).ainvoke(values)
+
+    if not isinstance(result, dict) or "parsed" not in result:
+        if result is None:
+            raise GraphLLMResponseError(
+                f"{schema.__name__} structured output parser returned None."
+            )
+        if isinstance(result, schema):
+            return result
+        return schema.model_validate(result)
+
+    parsed = result.get("parsed")
+    if parsed is not None:
+        if isinstance(parsed, schema):
+            return parsed
+        return schema.model_validate(parsed)
+
+    raw_payload = _extract_raw_payload(result.get("raw"))
+    if raw_payload is not None:
+        try:
+            return schema.model_validate(raw_payload)
+        except ValidationError as exc:
+            raise GraphLLMResponseError(
+                f"{schema.__name__} raw structured arguments failed validation: {exc}"
+            ) from exc
+
+    parsing_error = result.get("parsing_error")
+    raise GraphLLMResponseError(
+        f"{schema.__name__} structured output parser returned None. "
+        f"Parsing error: {parsing_error}"
+    )
 
 
 async def _invoke_plain_json(
@@ -114,6 +167,7 @@ async def _invoke_plain_json(
     values: dict[str, Any],
     *,
     temperature: float | None,
+    max_tokens: int | None,
     original_error: Exception,
 ) -> StructuredModel:
     messages = prompt.format_messages(**values)
@@ -127,7 +181,10 @@ async def _invoke_plain_json(
         )
     )
 
-    response = await create_chat_llm(temperature=temperature).ainvoke(messages)
+    response = await create_chat_llm(
+        temperature=temperature,
+        max_tokens=max_tokens,
+    ).ainvoke(messages)
     content = _message_content_to_text(getattr(response, "content", ""))
     try:
         data = parse_json_object(content)
@@ -156,6 +213,48 @@ def _structured_output_method() -> str:
         )
         return "function_calling"
     return method
+
+
+def _extract_raw_payload(raw: Any) -> dict[str, Any] | None:
+    """Extract JSON arguments from an AIMessage returned with include_raw=True."""
+
+    for call in getattr(raw, "tool_calls", None) or []:
+        payload = _extract_tool_call_args(call)
+        if payload is not None:
+            return payload
+
+    additional_kwargs = getattr(raw, "additional_kwargs", {}) or {}
+    for call in additional_kwargs.get("tool_calls") or []:
+        payload = _extract_tool_call_args(call)
+        if payload is not None:
+            return payload
+
+    content = _message_content_to_text(getattr(raw, "content", ""))
+    if content.strip():
+        try:
+            return parse_json_object(content)
+        except Exception:
+            return None
+    return None
+
+
+def _extract_tool_call_args(call: Any) -> dict[str, Any] | None:
+    if not isinstance(call, dict):
+        return None
+
+    args = call.get("args")
+    if args is None:
+        args = (call.get("function") or {}).get("arguments")
+
+    if isinstance(args, dict):
+        return args
+    if isinstance(args, str) and args.strip():
+        try:
+            data = parse_json_object(args)
+            return data
+        except Exception:
+            return None
+    return None
 
 
 def _should_retry_as_plain_json(exc: Exception) -> bool:

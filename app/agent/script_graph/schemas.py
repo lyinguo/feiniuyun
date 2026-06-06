@@ -15,6 +15,60 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 SCRIPT_SCHEMA_VERSION = "1.0"
 
 
+def normalize_slugline_time(value):
+    text = str(value or "").strip().lower()
+    aliases = {
+        "day": "noon",
+        "daytime": "noon",
+        "midday": "noon",
+        "中午": "noon",
+        "正午": "noon",
+        "白天": "noon",
+        "日间": "noon",
+        "清晨": "dawn",
+        "凌晨": "dawn",
+        "黎明": "dawn",
+        "上午": "morning",
+        "早晨": "morning",
+        "早上": "morning",
+        "下午": "afternoon",
+        "傍晚": "evening",
+        "黄昏": "evening",
+        "夜晚": "night",
+        "深夜": "night",
+        "晚上": "night",
+        "未知": "unknown",
+        "不明": "unknown",
+        "待确认": "unknown",
+    }
+    return aliases.get(text, text or "unknown")
+
+
+def normalize_slugline_space(value):
+    text = str(value or "").strip().lower().replace(" ", "")
+    aliases = {
+        "exterior/interior": "interior/exterior",
+        "interiorandexterior": "interior/exterior",
+        "exteriorandinterior": "interior/exterior",
+        "int/ext": "interior/exterior",
+        "ext/int": "interior/exterior",
+        "indoor/outdoor": "interior/exterior",
+        "outdoor/indoor": "interior/exterior",
+        "indoor": "interior",
+        "inside": "interior",
+        "室内": "interior",
+        "内景": "interior",
+        "outdoor": "exterior",
+        "outside": "exterior",
+        "室外": "exterior",
+        "外景": "exterior",
+        "未知": "unknown",
+        "不明": "unknown",
+        "待确认": "unknown",
+    }
+    return aliases.get(text, text or "unknown")
+
+
 class StrictModel(BaseModel):
     """Base model that rejects accidental extra fields from LLM output."""
 
@@ -157,6 +211,16 @@ class Slugline(StrictModel):
     time: Literal["dawn", "morning", "noon", "afternoon", "evening", "night", "unknown"] = "unknown"
     space: Literal["interior", "exterior", "interior/exterior", "unknown"] = "unknown"
 
+    @field_validator("time", mode="before")
+    @classmethod
+    def normalize_time(cls, value):
+        return normalize_slugline_time(value)
+
+    @field_validator("space", mode="before")
+    @classmethod
+    def normalize_space(cls, value):
+        return normalize_slugline_space(value)
+
 
 class DialogueLine(StrictModel):
     """A screenplay dialogue line."""
@@ -228,6 +292,72 @@ class ChapterScriptOutput(StrictModel):
     scenes: list[ScriptScene] = Field(..., min_length=1)
     continuity_notes: list[str] = Field(default_factory=list)
     revision_notes: list[str] = Field(default_factory=list)
+
+
+class DraftCharacter(StrictModel):
+    """Compact character row matching the user-facing chapter template."""
+
+    name: str = Field(..., min_length=1)
+    identity: str = Field(default="待确认")
+    personality: str = Field(default="待确认")
+
+
+class DraftDialogueLine(StrictModel):
+    """Compact dialogue row for one scene."""
+
+    speaker: str = Field(..., min_length=1)
+    emotion: str = Field(default="待确认")
+    line: str = Field(..., min_length=1)
+
+
+class DraftScene(StrictModel):
+    """Compact scene shape used to keep model output short and parseable."""
+
+    scene_number: int = Field(default=1)
+    location: str = Field(default="未标明地点")
+    time: Literal["dawn", "morning", "noon", "afternoon", "evening", "night", "unknown"] = "unknown"
+    space: Literal["interior", "exterior", "interior/exterior", "unknown"] = "unknown"
+    characters: list[str] = Field(default_factory=list)
+    purpose: str = Field(default="待确认")
+    conflict: str = Field(default="待确认")
+    action: str = Field(default="待补写可拍摄动作。")
+    dialogue: list[DraftDialogueLine] = Field(default_factory=list)
+
+    _normalize_time = field_validator("time", mode="before")(normalize_slugline_time)
+    _normalize_space = field_validator("space", mode="before")(normalize_slugline_space)
+
+    @field_validator("characters")
+    @classmethod
+    def trim_characters(cls, value: list[str]) -> list[str]:
+        return [str(item).strip() for item in value if str(item).strip()][:8]
+
+    @field_validator("dialogue")
+    @classmethod
+    def trim_dialogue(cls, value: list[DraftDialogueLine]) -> list[DraftDialogueLine]:
+        return value[:6]
+
+
+class ScreenwriterDraftOutput(StrictModel):
+    """Compact structured output requested from the Screenwriter LLM.
+
+    The backend expands this into ChapterScriptOutput locally. Keeping the LLM
+    contract compact prevents long JSON from being truncated by models with a
+    4K output limit.
+    """
+
+    schema_version: Literal["1.0"] = SCRIPT_SCHEMA_VERSION
+    chapter_title: str = Field(default="")
+    chapter_logline: str = Field(..., min_length=1)
+    chapter_summary: str = Field(..., min_length=1)
+    characters: list[DraftCharacter] = Field(default_factory=list)
+    scenes: list[DraftScene] = Field(..., min_length=1)
+    continuity_notes: list[str] = Field(default_factory=list)
+    revision_notes: list[str] = Field(default_factory=list)
+
+    @field_validator("characters")
+    @classmethod
+    def trim_character_rows(cls, value: list[DraftCharacter]) -> list[DraftCharacter]:
+        return value[:16]
 
 
 class CriticOutput(StrictModel):

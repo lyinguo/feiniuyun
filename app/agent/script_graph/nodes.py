@@ -29,10 +29,18 @@ from app.agent.script_graph.schemas import (
     ChapterScriptOutput,
     ContinuityReviewOutput,
     CriticOutput,
+    DialogueLine,
+    SceneContinuity,
+    ScreenwriterDraftOutput,
+    ScriptScene,
+    Slugline,
+    SourceReference,
+    CharacterUsage,
     GlobalCharacterProfile,
     RelationshipOutput,
     RelationshipProfile,
     RollingSummaryOutput,
+    SettingUsage,
 )
 from app.agent.script_graph.state import ScriptGraphState
 from app.services.yaml_builder import to_yaml
@@ -267,7 +275,7 @@ async def screenwriter_node(state: ScriptGraphState) -> dict[str, Any]:
 
     output = await invoke_structured(
         SCREENWRITER_PROMPT,
-        ChapterScriptOutput,
+        ScreenwriterDraftOutput,
         {
             "chapter_index": state.get("chapter_index", 1),
             "chapter_title": state.get("chapter_title", ""),
@@ -289,13 +297,14 @@ async def screenwriter_node(state: ScriptGraphState) -> dict[str, Any]:
         temperature=0.25,
     )
 
-    script_data = output.model_dump()
+    full_output = _draft_to_chapter_script_output(state, output)
+    script_data = full_output.model_dump()
     template_data = _chapter_script_to_template(state, script_data)
     script_yaml = to_yaml(template_data)
 
     logger.info(
         "[Screenwriter] done scenes=%d yaml_chars=%d",
-        len(output.scenes),
+        len(full_output.scenes),
         len(script_yaml),
     )
 
@@ -649,3 +658,70 @@ def _template_data_error(template_data: dict[str, Any]) -> str:
             if key not in scene:
                 return f"模板数据第 {index} 场缺少字段：{key}"
     return ""
+
+
+def _draft_to_chapter_script_output(
+    state: ScriptGraphState,
+    draft: ScreenwriterDraftOutput,
+) -> ChapterScriptOutput:
+    """Expand compact LLM screenwriter output into the internal rich schema."""
+
+    character_usage = [
+        CharacterUsage(
+            name=item.name,
+            function_in_chapter=item.identity,
+            state_change=item.personality,
+        )
+        for item in draft.characters
+    ]
+
+    settings_seen: dict[str, SettingUsage] = {}
+    scenes: list[ScriptScene] = []
+    for index, scene in enumerate(draft.scenes, start=1):
+        settings_seen.setdefault(
+            scene.location,
+            SettingUsage(
+                name=scene.location,
+                visual_or_plot_function=scene.purpose,
+            ),
+        )
+        scenes.append(
+            ScriptScene(
+                title=f"场景 {scene.scene_number or index}",
+                source_ref=SourceReference(
+                    chapter_title=state.get("chapter_title", ""),
+                    source_span="model_estimated",
+                ),
+                slugline=Slugline(
+                    location=scene.location,
+                    time=scene.time,
+                    space=scene.space,
+                ),
+                purpose=scene.purpose,
+                conflict=scene.conflict,
+                characters=scene.characters,
+                action=[scene.action],
+                dialogue=[
+                    DialogueLine(
+                        speaker=line.speaker,
+                        line=line.line,
+                        subtext=line.emotion,
+                    )
+                    for line in scene.dialogue
+                ],
+                visual_notes=[],
+                continuity=SceneContinuity(short_term_context=[]),
+                revision_note="AI 初稿，需人工复核。",
+            )
+        )
+
+    return ChapterScriptOutput(
+        chapter_title=draft.chapter_title or state.get("chapter_title", ""),
+        chapter_logline=draft.chapter_logline,
+        chapter_summary=draft.chapter_summary,
+        character_usage=character_usage,
+        setting_usage=list(settings_seen.values()),
+        scenes=scenes,
+        continuity_notes=draft.continuity_notes,
+        revision_notes=draft.revision_notes,
+    )

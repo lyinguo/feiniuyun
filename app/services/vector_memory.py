@@ -297,7 +297,14 @@ class VectorStoryMemory:
 
     @staticmethod
     def _namespace(user_id: str, book_title: str) -> str:
-        return f"{safe_component(user_id)}__{safe_component(book_title)}"
+        user_raw = str(user_id or "unknown")
+        book_raw = str(book_title or "unknown")
+        user_hash = hashlib.sha1(user_raw.encode("utf-8")).hexdigest()[:8]
+        book_hash = hashlib.sha1(book_raw.encode("utf-8")).hexdigest()[:12]
+        return (
+            f"{safe_component(user_raw)}_{user_hash}__"
+            f"{safe_component(book_raw)}_{book_hash}"
+        )
 
     def _json_path(self, namespace: str) -> Path:
         return self.base_dir / "json" / f"{namespace}.json"
