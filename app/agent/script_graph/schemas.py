@@ -238,6 +238,24 @@ class CriticOutput(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ContinuityIssue(StrictModel):
+    """A cross-chapter continuity, grammar, or logic issue."""
+
+    severity: Literal["blocker", "warning"] = "warning"
+    issue: str = Field(..., min_length=1)
+    evidence: str = Field(default="")
+    revision_instruction: str = Field(default="")
+
+
+class ContinuityReviewOutput(StrictModel):
+    """Final continuity review after the chapter script has been generated."""
+
+    passed: bool = Field(..., description="False only for issues that require regenerating the chapter")
+    error_msg: str = Field(default="", description="Actionable rewrite instruction when passed is false")
+    warnings: list[str] = Field(default_factory=list)
+    issues: list[ContinuityIssue] = Field(default_factory=list)
+
+
 class RollingSummaryOutput(StrictModel):
     """Structured output of the Summarizer node."""
 

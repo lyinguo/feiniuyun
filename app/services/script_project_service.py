@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from app.agent.script_graph.workflow import run_chapter
+from app.agent.script_graph.workflow import load_template_schema, run_chapter
 from app.models.request import ConvertProjectRequest
 from app.services.chapter_splitter import Chapter
 from app.services.memory_store import memory_store, safe_component
@@ -114,6 +114,8 @@ class ScriptProjectService:
         rolling_summary = self._seed_rolling_summary(memory)
         global_characters = self._seed_records(memory, "characters")
         global_settings = self._seed_records(memory, "locations")
+        previous_chapter_summaries = self._seed_previous_chapter_summaries(memory)
+        template_schema = load_template_schema()
 
         acts: list[dict[str, Any]] = []
         total_scene_count = 0
@@ -137,6 +139,10 @@ class ScriptProjectService:
                 rolling_summary=rolling_summary,
                 global_characters=global_characters,
                 global_settings=global_settings,
+                user_id=request.user_id,
+                book_title=book_title,
+                previous_chapter_summaries=previous_chapter_summaries,
+                template_schema=template_schema,
                 scene_density=request.scene_density,
                 max_retries=request.max_retries,
             )
@@ -163,12 +169,32 @@ class ScriptProjectService:
                 "txt_char_count": len(plot_text),
                 "source_char_count": len(unit.text),
                 "scene_count": scene_count,
+                "chapter_summary": script_data.get("chapter_summary", ""),
+                "rolling_summary_after": rolling_summary,
                 "character_introductions": self._character_introductions(script_data),
                 "critic_warnings": result.get("critic_warnings", []),
+                "continuity_warnings": result.get("continuity_warnings", []),
+                "continuity_review": result.get("continuity_review", {}),
                 "error_msg": result.get("error_msg", ""),
                 "retry_count": result.get("retry_count", 0),
+                "retrieved_memory_count": len(result.get("retrieved_memories") or []),
+                "vector_memory_writes": result.get("vector_memory_writes", 0),
+                "canon_facts": (result.get("archivist_notes") or {}).get("canon_facts", []),
+                "open_threads": (
+                    (result.get("archivist_notes") or {})
+                    .get("latest_summary_metadata", {})
+                    .get("open_threads", [])
+                ),
             }
             acts.append(act)
+            previous_chapter_summaries.append(
+                {
+                    "chapter_index": unit.unit_index,
+                    "chapter_title": unit.display_title,
+                    "summary": script_data.get("chapter_summary", ""),
+                    "rolling_summary_after": rolling_summary,
+                }
+            )
             yield {
                 "event": "unit_done",
                 "unit_index": unit.unit_index,
@@ -197,6 +223,7 @@ class ScriptProjectService:
             "rolling_summary": rolling_summary,
             "global_characters": global_characters,
             "global_settings": global_settings,
+            "template_schema_path": "template.yaml",
             "acts": acts,
             "stats": {
                 "logical_chapter_count": len({item.logical_index for item in units}),
@@ -381,11 +408,28 @@ class ScriptProjectService:
         return []
 
     @staticmethod
+    def _seed_previous_chapter_summaries(memory: dict[str, Any]) -> list[dict[str, Any]]:
+        recent = memory.get("short_term", {}).get("recent_chapters", [])
+        return [
+            {
+                "chapter_index": index,
+                "chapter_title": item.get("title", ""),
+                "summary": item.get("summary", ""),
+            }
+            for index, item in enumerate(recent, start=1)
+            if isinstance(item, dict) and item.get("summary")
+        ]
+
+    @staticmethod
     def _render_plot_text(
         unit: SourceUnit,
         script_data: dict[str, Any],
         result: dict[str, Any],
     ) -> str:
+        yaml_text = (result.get("current_script_yaml") or "").strip()
+        if yaml_text:
+            return yaml_text + "\n"
+
         lines = [
             f"标题：{unit.display_title}",
             f"来源文件：{unit.source_file}",
@@ -463,7 +507,7 @@ class ScriptProjectService:
             {
                 "chapter_id": item["act_id"],
                 "title": item["chapter_title"],
-                "summary": f"{item['txt_file']}，{item['scene_count']} 场戏",
+                "summary": item.get("chapter_summary") or f"{item['scene_count']} 场戏",
                 "scene_ids": [],
                 "active_characters": [
                     character["name"]
@@ -481,7 +525,61 @@ class ScriptProjectService:
         long_term["locations"] = {
             f"setting_{index:04d}": item for index, item in enumerate(global_settings, start=1)
         }
+        long_term["canon_facts"] = _dedupe_text_records(
+            [
+                *long_term.get("canon_facts", []),
+                *[
+                    fact.get("fact", "")
+                    for act in acts
+                    for fact in act.get("canon_facts", [])
+                    if isinstance(fact, dict) and fact.get("fact")
+                ],
+            ],
+            limit=120,
+        )
+        long_term["unresolved_threads"] = _dedupe_thread_records(
+            [
+                *long_term.get("unresolved_threads", []),
+                *[
+                    {"description": thread, "status": "open"}
+                    for act in acts
+                    for thread in act.get("open_threads", [])
+                    if thread
+                ],
+            ],
+            limit=120,
+        )
         memory_store.save(request.user_id, request.thread_id, memory)
+
+
+def _dedupe_text_records(items: list[Any], *, limit: int) -> list[str]:
+    seen: set[str] = set()
+    output: list[str] = []
+    for item in items:
+        text = item.get("fact", "") if isinstance(item, dict) else str(item or "")
+        text = text.strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        output.append(text)
+    return output[-limit:]
+
+
+def _dedupe_thread_records(items: list[Any], *, limit: int) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    output: list[dict[str, Any]] = []
+    for item in items:
+        if isinstance(item, dict):
+            description = str(item.get("description", "")).strip()
+            status = str(item.get("status", "open")).strip() or "open"
+        else:
+            description = str(item or "").strip()
+            status = "open"
+        if not description or description in seen:
+            continue
+        seen.add(description)
+        output.append({"description": description, "status": status})
+    return output[-limit:]
 
 
 script_project_service = ScriptProjectService()

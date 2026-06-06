@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+import json
+import logging
+from typing import Any, TypeVar
 
+from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
 from app.config import settings
+from app.services.llm_output_parser import parse_json_object
 
 StructuredModel = TypeVar("StructuredModel", bound=BaseModel)
+logger = logging.getLogger(__name__)
 
 
 class GraphLLMConfigurationError(RuntimeError):
     """Raised when the LangGraph agent LLM cannot be created."""
+
+
+class GraphLLMResponseError(RuntimeError):
+    """Raised when a graph LLM call cannot be parsed into the requested schema."""
 
 
 def create_chat_llm(*, temperature: float | None = None):
@@ -48,5 +58,130 @@ def create_chat_llm(*, temperature: float | None = None):
 def create_structured_llm(schema: type[StructuredModel], *, temperature: float | None = None):
     """Create an LLM bound to a Pydantic structured-output schema."""
 
-    return create_chat_llm(temperature=temperature).with_structured_output(schema)
+    method = _structured_output_method()
+    return create_chat_llm(temperature=temperature).with_structured_output(
+        schema,
+        method=method,
+    )
 
+
+async def invoke_structured(
+    prompt: ChatPromptTemplate,
+    schema: type[StructuredModel],
+    values: dict[str, Any],
+    *,
+    temperature: float | None = None,
+) -> StructuredModel:
+    """Invoke a prompt and return a validated Pydantic object.
+
+    Some OpenAI-compatible providers reject provider-native ``response_format``
+    modes, and LangChain can return ``None`` when a tool/function response is
+    present but not parseable. This helper keeps the preferred structured
+    output path, then falls back to plain chat + JSON parsing without sending
+    ``response_format``.
+    """
+
+    try:
+        chain = prompt | create_structured_llm(schema, temperature=temperature)
+        output = await chain.ainvoke(values)
+        if output is None:
+            raise GraphLLMResponseError(
+                f"{schema.__name__} structured output parser returned None."
+            )
+        if isinstance(output, schema):
+            return output
+        return schema.model_validate(output)
+    except Exception as exc:
+        if _should_retry_as_plain_json(exc):
+            logger.warning(
+                "Structured output failed for %s, retrying as plain JSON: %s",
+                schema.__name__,
+                exc,
+            )
+            return await _invoke_plain_json(
+                prompt,
+                schema,
+                values,
+                temperature=temperature,
+                original_error=exc,
+            )
+        raise
+
+
+async def _invoke_plain_json(
+    prompt: ChatPromptTemplate,
+    schema: type[StructuredModel],
+    values: dict[str, Any],
+    *,
+    temperature: float | None,
+    original_error: Exception,
+) -> StructuredModel:
+    messages = prompt.format_messages(**values)
+    schema_json = json.dumps(schema.model_json_schema(), ensure_ascii=False)
+    messages.append(
+        HumanMessage(
+            content=(
+                "请重新输出，且只能输出一个 JSON object。不要使用 Markdown，不要解释。\n"
+                f"JSON 必须满足这个 Pydantic schema：\n{schema_json}"
+            )
+        )
+    )
+
+    response = await create_chat_llm(temperature=temperature).ainvoke(messages)
+    content = _message_content_to_text(getattr(response, "content", ""))
+    try:
+        data = parse_json_object(content)
+        return schema.model_validate(data)
+    except Exception as exc:
+        raise GraphLLMResponseError(
+            f"{schema.__name__} output could not be parsed. "
+            f"Original structured error: {original_error}. "
+            f"Fallback parse error: {exc}. First 500 chars: {content[:500]}"
+        ) from exc
+
+
+def _structured_output_method() -> str:
+    method = (settings.llm_structured_output_method or "function_calling").strip().lower()
+    if method in {"json_schema", "json_object", "response_format", "json_mode"}:
+        logger.warning(
+            "LLM_STRUCTURED_OUTPUT_METHOD=%s may use provider response_format; "
+            "using function_calling for OpenAI-compatible compatibility.",
+            method,
+        )
+        return "function_calling"
+    if method not in {"function_calling"}:
+        logger.warning(
+            "Unknown LLM_STRUCTURED_OUTPUT_METHOD=%s; using function_calling.",
+            method,
+        )
+        return "function_calling"
+    return method
+
+
+def _should_retry_as_plain_json(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return (
+        isinstance(exc, GraphLLMResponseError)
+        or "response_format" in text
+        or "structured output" in text
+        or "tool" in text
+        or "function" in text
+        or "parse" in text
+        or "validation" in text
+    )
+
+
+def _message_content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                text = item.get("text") or item.get("content")
+                if text:
+                    parts.append(str(text))
+        return "\n".join(parts)
+    return str(content or "")

@@ -40,11 +40,13 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     llm_timeout_seconds: float = 90.0
     llm_max_retries: int = 2
+    llm_structured_output_method: str = "function_calling"
 
     max_input_chars: int = 600_000
     max_chapters_per_request: int = 120
     default_short_term_window: int = 2
     memory_dir: Path = Path("data/memory")
+    vector_memory_dir: Path = Path("data/vector_memory")
 
     enable_mcp_tools: bool = False
     mcp_config_path: str = ""
@@ -112,6 +114,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     settings = Settings()
     settings.memory_dir.mkdir(parents=True, exist_ok=True)
+    settings.vector_memory_dir.mkdir(parents=True, exist_ok=True)
     return settings
 
 

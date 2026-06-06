@@ -192,7 +192,7 @@ SCREENWRITER_PROMPT = ChatPromptTemplate.from_messages(
 3. 每场戏必须包含 slugline、purpose、conflict、characters、action、dialogue、continuity。
 4. 心理描写要尽量改成可拍摄的动作、道具、视线、调度、声音或对白。
 5. 必须保持人物、地点、服装和世界设定的一致性。
-6. 如果 error_msg 不为空，说明上一次格式失败，请按错误信息修正后重新生成。
+6. 如果 error_msg 不为空，说明上一次格式或连续性评判失败，请按错误信息修正后重新生成。
 7. 不要输出 Markdown，不要输出 YAML 字符串；你必须返回 ChapterScriptOutput 结构化对象。
 
 输出必须严格符合 ChapterScriptOutput。""",
@@ -210,8 +210,17 @@ SCREENWRITER_PROMPT = ChatPromptTemplate.from_messages(
 目标每章拆场密度：
 {scene_density}
 
+最终每章 YAML 必须可以转换为这个模板：
+{template_schema}
+
 前情提要 rolling_summary：
 {rolling_summary}
+
+之前各章节压缩情节：
+{previous_chapter_summaries}
+
+长期记忆检索结果：
+{retrieved_memories}
 
 全局人物档案：
 {global_characters}
@@ -265,7 +274,75 @@ CRITIC_PROMPT = ChatPromptTemplate.from_messages(
 当前剧本数据：
 {current_script_data}
 
+当前模板数据：
+{current_template_data}
+
+目标 YAML 模板：
+{template_schema}
+
 当前剧本 YAML：
+{current_script_yaml}
+""",
+        ),
+    ]
+)
+
+
+CONTINUITY_CRITIC_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """你是“连续性评判 Continuity Judge”，是每章生成后的最终评判 agent。
+
+你的职责：
+1. 结合长期记忆检索结果、全局人物/设定档案、上一章 rolling_summary、之前各章节压缩情节，检查当前章节剧本是否连贯。
+2. 检查人物身份、性格、目标、关系、法宝/道具/规则、隐藏伏笔是否前后矛盾。
+3. 检查当前章节是否遗漏原文章节的关键事件，或把剧情推进顺序写错。
+4. 检查中文语法、对白可读性、场景动作是否清楚。
+5. 只有出现会导致观众理解错误、人物设定崩坏、重大剧情断裂、模板严重不符合时，才 passed=false。
+6. passed=false 时，error_msg 必须给编剧一个可直接重写的指令，并引用必要历史信息。
+7. 普通润色建议放入 warnings，不要阻断。
+
+输出必须严格符合 ContinuityReviewOutput。""",
+        ),
+        (
+            "human",
+            """请做本章最终连续性评判。
+
+章节序号：
+{chapter_index}
+
+章节标题：
+{chapter_title}
+
+当前原文章节：
+{current_chapter}
+
+上一章滚动前情提要：
+{rolling_summary}
+
+之前各章节压缩情节：
+{previous_chapter_summaries}
+
+长期记忆检索结果：
+{retrieved_memories}
+
+全局人物档案：
+{global_characters}
+
+全局设定档案：
+{global_settings}
+
+格式审查 warnings：
+{critic_warnings}
+
+目标 YAML 模板：
+{template_schema}
+
+当前剧本数据：
+{current_script_data}
+
+当前 YAML：
 {current_script_yaml}
 """,
         ),

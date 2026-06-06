@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.core.llm_client import LLMConfigurationError, LLMError
-from app.agent.script_graph.llm import GraphLLMConfigurationError
+from app.agent.script_graph.llm import GraphLLMConfigurationError, GraphLLMResponseError
 from app.models.request import ClearMemoryRequest, ConvertNovelRequest, ConvertProjectRequest
 from app.models.response import ApiResponse, ConvertNovelData
 from app.services.adaptation_service import AdaptationError, novel_adaptation_service
@@ -44,6 +44,8 @@ async def convert_project(request: ConvertProjectRequest) -> ApiResponse:
         return ApiResponse(data=data)
     except GraphLLMConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except GraphLLMResponseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ScriptProjectError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -57,6 +59,11 @@ async def convert_project_stream(request: ConvertProjectRequest) -> StreamingRes
             async for event in script_project_service.stream_project_events(request):
                 yield json.dumps(event, ensure_ascii=False) + "\n"
         except (GraphLLMConfigurationError, ScriptProjectError) as exc:
+            yield json.dumps(
+                {"event": "error", "message": str(exc)},
+                ensure_ascii=False,
+            ) + "\n"
+        except GraphLLMResponseError as exc:
             yield json.dumps(
                 {"event": "error", "message": str(exc)},
                 ensure_ascii=False,

@@ -11,3 +11,4 @@ python-multipart
 langchain-core>=0.1.0
 langchain-openai>=1.0.0
 langgraph>=0.0.40
+chromadb>=0.5.0

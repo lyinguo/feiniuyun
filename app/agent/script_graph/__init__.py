@@ -6,6 +6,7 @@ from app.agent.script_graph.schemas import (
     CastingOutput,
     CharacterOutput,
     ChapterScriptOutput,
+    ContinuityReviewOutput,
     CriticOutput,
     GlobalCharacterProfile,
     GlobalSettingProfile,
@@ -18,6 +19,7 @@ from app.agent.script_graph.nodes import (
     background_node,
     casting_node,
     character_node,
+    continuity_critic_node,
     critic_node,
     merge_prelude_node,
     relationship_node,
@@ -27,6 +29,7 @@ from app.agent.script_graph.nodes import (
 from app.agent.script_graph.workflow import (
     build_script_graph,
     route_after_critic,
+    route_after_format_critic,
     run_chapter,
     run_chapters,
 )
@@ -38,6 +41,7 @@ __all__ = [
     "RelationshipOutput",
     "CastingOutput",
     "ChapterScriptOutput",
+    "ContinuityReviewOutput",
     "CriticOutput",
     "GlobalCharacterProfile",
     "GlobalSettingProfile",
@@ -52,9 +56,11 @@ __all__ = [
     "merge_prelude_node",
     "screenwriter_node",
     "critic_node",
+    "continuity_critic_node",
     "summarizer_node",
     "build_script_graph",
     "route_after_critic",
+    "route_after_format_critic",
     "run_chapter",
     "run_chapters",
 ]

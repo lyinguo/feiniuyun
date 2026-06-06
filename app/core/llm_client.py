@@ -70,7 +70,6 @@ class OpenAICompatibleLLMClient:
                 self.settings.llm_temperature if temperature is None else temperature
             ),
             "max_tokens": max_tokens or self.settings.llm_max_tokens,
-            "response_format": {"type": "json_object"},
         }
         headers = {
             "Authorization": f"Bearer {self.settings.llm_api_key}",

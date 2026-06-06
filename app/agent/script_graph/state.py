@@ -25,13 +25,22 @@ class ScriptGraphState(TypedDict):
     # Useful orchestration metadata for later nodes and demos.
     chapter_index: int
     chapter_title: str
+    user_id: str
+    book_title: str
     current_script_data: dict[str, Any]
+    current_template_data: dict[str, Any]
     archivist_notes: dict[str, Any]
     background_notes: dict[str, Any]
     character_notes: dict[str, Any]
     relationship_notes: dict[str, Any]
     casting_notes: dict[str, Any]
+    retrieved_memories: list[dict[str, Any]]
+    previous_chapter_summaries: list[dict[str, Any]]
+    template_schema: str
     critic_warnings: list[str]
+    continuity_warnings: list[str]
+    continuity_review: dict[str, Any]
+    vector_memory_writes: int
     max_retries: int
     scene_density: int
 
@@ -44,6 +53,11 @@ def initial_script_graph_state(
     rolling_summary: str = "",
     global_characters: list[dict[str, Any]] | None = None,
     global_settings: list[dict[str, Any]] | None = None,
+    user_id: str = "",
+    book_title: str = "",
+    retrieved_memories: list[dict[str, Any]] | None = None,
+    previous_chapter_summaries: list[dict[str, Any]] | None = None,
+    template_schema: str = "",
     max_retries: int = 2,
     scene_density: int = 3,
 ) -> ScriptGraphState:
@@ -59,13 +73,22 @@ def initial_script_graph_state(
         "retry_count": 0,
         "chapter_index": chapter_index,
         "chapter_title": chapter_title,
+        "user_id": user_id,
+        "book_title": book_title,
         "current_script_data": {},
+        "current_template_data": {},
         "archivist_notes": {},
         "background_notes": {},
         "character_notes": {},
         "relationship_notes": {},
         "casting_notes": {},
+        "retrieved_memories": retrieved_memories or [],
+        "previous_chapter_summaries": previous_chapter_summaries or [],
+        "template_schema": template_schema,
         "critic_warnings": [],
+        "continuity_warnings": [],
+        "continuity_review": {},
+        "vector_memory_writes": 0,
         "max_retries": max_retries,
         "scene_density": scene_density,
     }
