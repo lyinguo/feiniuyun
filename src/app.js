@@ -577,7 +577,7 @@
       adaptation_tone: [tone, formatPrompt].filter(Boolean).join("\n\n"),
       scene_density: Number(els.densityRange.value),
       short_term_window: Number(els.shortWindow.value),
-      max_chunk_chars: 12000,
+      max_chunk_chars: 8000,
       max_retries: 2
     };
   }

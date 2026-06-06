@@ -20,6 +20,7 @@ from app.agent.script_graph.nodes import (
     summarizer_node,
 )
 from app.agent.script_graph.state import ScriptGraphState, initial_script_graph_state
+from app.agent.script_graph.memory_ops import compact_text_for_prompt
 from app.services.chapter_splitter import Chapter
 from app.services.vector_memory import vector_story_memory
 
@@ -39,6 +40,9 @@ ROUTE_CONTINUITY = "continuity"
 ROUTE_SUMMARIZE = "summarize"
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[3] / "template.yaml"
+DIRECT_SUMMARY_CHAR_LIMIT = 1800
+RAG_RESULT_LIMIT = 6
+PREVIOUS_SUMMARY_DIRECT_LIMIT = 1
 
 
 def route_after_critic(state: ScriptGraphState) -> str:
@@ -180,19 +184,19 @@ async def run_chapter(
             user_id=user_id,
             book_title=book_title,
             query=_memory_query(chapter, rolling_summary),
-            limit=8,
+            limit=RAG_RESULT_LIMIT,
         )
     state = initial_script_graph_state(
         current_chapter=chapter.text,
         chapter_index=chapter.index,
         chapter_title=chapter.title,
-        rolling_summary=rolling_summary,
+        rolling_summary=compact_text_for_prompt(rolling_summary, DIRECT_SUMMARY_CHAR_LIMIT),
         global_characters=global_characters,
         global_settings=global_settings,
         user_id=user_id,
         book_title=book_title,
         retrieved_memories=effective_retrieved_memories,
-        previous_chapter_summaries=previous_chapter_summaries,
+        previous_chapter_summaries=_recent_previous_summaries(previous_chapter_summaries),
         template_schema=effective_template_schema,
         scene_density=scene_density,
         max_retries=max_retries,
@@ -254,7 +258,10 @@ async def run_chapters(
             scene_density=scene_density,
             max_retries=max_retries,
         )
-        rolling_summary = result.get("rolling_summary", rolling_summary)
+        rolling_summary = compact_text_for_prompt(
+            result.get("rolling_summary", rolling_summary),
+            DIRECT_SUMMARY_CHAR_LIMIT,
+        )
         global_characters = result.get("global_characters", global_characters)
         global_settings = result.get("global_settings", global_settings)
         chapter_results.append(
@@ -298,14 +305,18 @@ def load_template_schema() -> str:
         return ""
 
 
+def _recent_previous_summaries(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    return list(items or [])[-PREVIOUS_SUMMARY_DIRECT_LIMIT:]
+
+
 def _memory_query(chapter: Chapter, rolling_summary: str) -> str:
     source = chapter.text.strip()
     return "\n".join(
         item
         for item in [
             chapter.title,
-            rolling_summary.strip(),
-            source[:4000],
+            compact_text_for_prompt(rolling_summary, 1000),
+            source[:2500],
         ]
         if item
     )

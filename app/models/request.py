@@ -52,7 +52,7 @@ class ConvertProjectRequest(BaseModel):
     short_term_window: int = Field(default=2, ge=1, le=8)
     max_chapters: Optional[int] = Field(default=None, ge=1, le=120)
     max_units: Optional[int] = Field(default=None, ge=1, le=500)
-    max_chunk_chars: int = Field(default=12000, ge=2000, le=30000)
+    max_chunk_chars: int = Field(default=8000, ge=2000, le=30000)
     max_retries: int = Field(default=2, ge=0, le=5)
 
     @field_validator("user_id", "thread_id", "project_path")

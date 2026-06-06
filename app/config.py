@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     )
     llm_model: str = "qwen-max"
     llm_temperature: float = 0.25
-    llm_max_tokens: int = 4096
+    llm_max_tokens: int = 384000
     llm_timeout_seconds: float = 90.0
     llm_max_retries: int = 2
     llm_structured_output_method: str = "function_calling"

@@ -11,6 +11,21 @@ from app.agent.script_graph.schemas import (
     GlobalSettingProfile,
 )
 
+PROMPT_TEXT_LIMIT = 700
+PROMPT_NESTED_LIST_LIMIT = 6
+PROMPT_DICT_ITEM_LIMIT = 24
+
+MERGED_LIST_FIELD_LIMITS = {
+    "aliases": 8,
+    "personality": 8,
+    "goals": 8,
+    "relationships": 12,
+    "continuity_notes": 12,
+    "costume_notes": 8,
+    "rules_or_constraints": 10,
+}
+HEAD_PRESERVED_FIELDS = {"aliases", "personality", "goals"}
+
 
 def merge_archivist_output(
     *,
@@ -79,10 +94,45 @@ def merge_archivist_output(
 
 
 def compact_for_prompt(value: Any, limit: int = 40) -> Any:
-    """Limit large archives before passing them to a prompt."""
+    """Limit large archives before passing them to a prompt.
 
+    The graph stores rich long-term archives, but prompts only need compact
+    working context. This keeps later chapters from carrying ever-growing
+    relationship lists and long free-text fields into every model call.
+    """
+
+    return _compact_value(value, limit=limit, depth=0)
+
+
+def compact_text_for_prompt(value: Any, limit: int = 1600) -> str:
+    """Clip long direct text while keeping both the beginning and recent tail."""
+
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    marker = "\n...\n"
+    if limit <= len(marker):
+        return text[:limit]
+    head_size = max(0, limit // 3)
+    tail_size = max(0, limit - head_size - len(marker))
+    return f"{text[:head_size].rstrip()}{marker}{text[-tail_size:].lstrip()}"
+
+
+def _compact_value(value: Any, *, limit: int, depth: int) -> Any:
     if isinstance(value, list):
-        return value[-limit:]
+        item_limit = limit if depth == 0 else PROMPT_NESTED_LIST_LIMIT
+        return [
+            _compact_value(item, limit=limit, depth=depth + 1)
+            for item in value[-item_limit:]
+        ]
+    if isinstance(value, dict):
+        items = list(value.items())[:PROMPT_DICT_ITEM_LIMIT]
+        return {
+            key: _compact_value(item, limit=limit, depth=depth + 1)
+            for key, item in items
+        }
+    if isinstance(value, str):
+        return compact_text_for_prompt(value, PROMPT_TEXT_LIMIT)
     return value
 
 
@@ -93,7 +143,7 @@ def _merge_profile(
     list_fields: Iterable[str],
     scalar_fields: Iterable[str],
 ) -> str:
-    incoming = profile.model_dump()
+    incoming = _cap_record_lists(profile.model_dump(), list_fields)
     existing = _find_by_name(records, incoming["name"])
 
     if existing is None:
@@ -110,8 +160,24 @@ def _merge_profile(
         for item in incoming.get(field) or []:
             if not _contains_equivalent(existing_values, item):
                 existing_values.append(item)
+        existing[field] = _cap_list_field(field, existing_values)
 
     return "updated"
+
+
+def _cap_record_lists(record: dict[str, Any], list_fields: Iterable[str]) -> dict[str, Any]:
+    for field in list_fields:
+        record[field] = _cap_list_field(field, list(record.get(field) or []))
+    return record
+
+
+def _cap_list_field(field: str, values: list[Any]) -> list[Any]:
+    limit = MERGED_LIST_FIELD_LIMITS.get(field)
+    if not limit or len(values) <= limit:
+        return values
+    if field in HEAD_PRESERVED_FIELDS:
+        return values[:limit]
+    return values[-limit:]
 
 
 def _find_by_name(records: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
@@ -141,4 +207,3 @@ def _is_meaningful(value: Any) -> bool:
     if isinstance(value, list):
         return bool(value)
     return True
-

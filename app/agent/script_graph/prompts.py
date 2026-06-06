@@ -56,6 +56,10 @@ CHARACTER_PROMPT = ChatPromptTemplate.from_messages(
 输出必须严格符合 CharacterOutput。""",
         ),
         (
+            "system",
+            """只输出本章新增或本章发生变化的人物信息，不要补全或复述未变化的全局人物档案。new_characters 最多 12 个，updated_characters 最多 12 个，每个人物 relationships 最多 8 条；证据、状态和备注必须简短。""",
+        ),
+        (
             "human",
             """请分析当前章节的人物信息。
 

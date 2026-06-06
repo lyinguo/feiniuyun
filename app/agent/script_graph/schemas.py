@@ -7,12 +7,29 @@ of free-form text, then the Critic node can validate and convert it to YAML.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 SCRIPT_SCHEMA_VERSION = "1.0"
+CHARACTER_OUTPUT_LIMIT = 12
+CHARACTER_PROFILE_LIST_LIMIT = 6
+CHARACTER_RELATIONSHIP_LIMIT = 8
+CHARACTER_NOTE_LIMIT = 8
+CHARACTER_TEXT_LIMIT = 300
+
+
+def _trim_list(value: Any, limit: int) -> Any:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value[:limit]
+    return value
+
+
+def _trim_text(value: Any, limit: int = CHARACTER_TEXT_LIMIT) -> str:
+    return str(value or "")[:limit]
 
 
 def normalize_slugline_time(value):
@@ -78,26 +95,57 @@ class StrictModel(BaseModel):
 class RelationshipProfile(StrictModel):
     """Relationship between two characters."""
 
-    target_name: str = Field(..., min_length=1, description="Name of the related character")
-    relation: str = Field(..., min_length=1, description="Relationship, conflict, or alliance")
-    evidence: str = Field(default="", description="Source evidence from the chapter")
+    target_name: str = Field(..., min_length=1, max_length=80, description="Name of the related character")
+    relation: str = Field(..., min_length=1, max_length=160, description="Relationship, conflict, or alliance")
+    evidence: str = Field(default="", max_length=240, description="Source evidence from the chapter")
+
+    @field_validator("target_name", mode="before")
+    @classmethod
+    def trim_relationship_target(cls, value):
+        return _trim_text(value, 80)
+
+    @field_validator("relation", mode="before")
+    @classmethod
+    def trim_relationship_relation(cls, value):
+        return _trim_text(value, 160)
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def trim_relationship_evidence(cls, value):
+        return _trim_text(value, 240)
 
 
 class GlobalCharacterProfile(StrictModel):
     """Long-term character archive maintained by the Archivist agent."""
 
     name: str = Field(..., min_length=1, description="Canonical character name")
-    aliases: list[str] = Field(default_factory=list, description="Nicknames or alternate names")
+    aliases: list[str] = Field(default_factory=list, max_length=CHARACTER_PROFILE_LIST_LIMIT, description="Nicknames or alternate names")
     appearance: str = Field(default="待确认", description="Visual appearance and costume anchors")
-    personality: list[str] = Field(default_factory=list, description="Stable personality traits")
-    goals: list[str] = Field(default_factory=list, description="Current or long-term dramatic goals")
-    relationships: list[RelationshipProfile] = Field(default_factory=list)
+    personality: list[str] = Field(default_factory=list, max_length=CHARACTER_PROFILE_LIST_LIMIT, description="Stable personality traits")
+    goals: list[str] = Field(default_factory=list, max_length=CHARACTER_PROFILE_LIST_LIMIT, description="Current or long-term dramatic goals")
+    relationships: list[RelationshipProfile] = Field(default_factory=list, max_length=CHARACTER_RELATIONSHIP_LIMIT)
     first_seen_chapter: str = Field(default="", description="Chapter title or index where first seen")
     latest_state: str = Field(default="", description="Latest emotional or plot state")
     continuity_notes: list[str] = Field(
         default_factory=list,
+        max_length=CHARACTER_NOTE_LIMIT,
         description="Facts that must stay consistent in later chapters",
     )
+
+    @field_validator("aliases", "personality", "goals", "continuity_notes", mode="before")
+    @classmethod
+    def trim_profile_text_lists(cls, value):
+        return _trim_list(value, CHARACTER_PROFILE_LIST_LIMIT)
+
+    @field_validator("relationships", mode="before")
+    @classmethod
+    def trim_relationships(cls, value):
+        return _trim_list(value, CHARACTER_RELATIONSHIP_LIMIT)
+
+    @field_validator("appearance", "latest_state", mode="before")
+    @classmethod
+    def trim_profile_text(cls, value):
+        return _trim_text(value)
 
 
 class GlobalSettingProfile(StrictModel):
@@ -137,10 +185,20 @@ class BackgroundOutput(StrictModel):
 class CharacterOutput(StrictModel):
     """Parallel pre-analysis focused on characters."""
 
-    new_characters: list[GlobalCharacterProfile] = Field(default_factory=list)
-    updated_characters: list[GlobalCharacterProfile] = Field(default_factory=list)
-    character_observations: list[str] = Field(default_factory=list)
-    continuity_risks: list[str] = Field(default_factory=list)
+    new_characters: list[GlobalCharacterProfile] = Field(default_factory=list, max_length=CHARACTER_OUTPUT_LIMIT)
+    updated_characters: list[GlobalCharacterProfile] = Field(default_factory=list, max_length=CHARACTER_OUTPUT_LIMIT)
+    character_observations: list[str] = Field(default_factory=list, max_length=CHARACTER_OUTPUT_LIMIT)
+    continuity_risks: list[str] = Field(default_factory=list, max_length=CHARACTER_NOTE_LIMIT)
+
+    @field_validator("new_characters", "updated_characters", "character_observations", mode="before")
+    @classmethod
+    def trim_character_output_lists(cls, value):
+        return _trim_list(value, CHARACTER_OUTPUT_LIMIT)
+
+    @field_validator("continuity_risks", mode="before")
+    @classmethod
+    def trim_character_risks(cls, value):
+        return _trim_list(value, CHARACTER_NOTE_LIMIT)
 
 
 class RelationshipEntry(StrictModel):

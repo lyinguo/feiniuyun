@@ -7,8 +7,12 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.agent.script_graph.llm import invoke_structured
-from app.agent.script_graph.memory_ops import compact_for_prompt, merge_archivist_output
+from app.agent.script_graph.llm import GraphLLMResponseError, invoke_structured
+from app.agent.script_graph.memory_ops import (
+    compact_for_prompt,
+    compact_text_for_prompt,
+    merge_archivist_output,
+)
 from app.agent.script_graph.prompts import (
     ARCHIVIST_PROMPT,
     BACKGROUND_PROMPT,
@@ -47,22 +51,64 @@ from app.services.yaml_builder import to_yaml
 
 logger = logging.getLogger(__name__)
 
+CHARACTER_PROMPT_ARCHIVE_LIMIT = 16
+SETTING_PROMPT_ARCHIVE_LIMIT = 12
+RETRIEVED_MEMORY_PROMPT_LIMIT = 6
+PREVIOUS_SUMMARY_PROMPT_LIMIT = 1
+ROLLING_SUMMARY_PROMPT_CHARS = 1200
+COMPACT_RETRY_CHAPTER_CHARS = 5000
+
+
+def _prompt_rolling_summary(state: ScriptGraphState) -> str:
+    return compact_text_for_prompt(
+        state.get("rolling_summary", ""),
+        ROLLING_SUMMARY_PROMPT_CHARS,
+    )
+
+
+def _prompt_global_characters(state: ScriptGraphState, limit: int = CHARACTER_PROMPT_ARCHIVE_LIMIT) -> str:
+    return dump_prompt_json(compact_for_prompt(state.get("global_characters", []), limit=limit))
+
+
+def _prompt_global_settings(state: ScriptGraphState, limit: int = SETTING_PROMPT_ARCHIVE_LIMIT) -> str:
+    return dump_prompt_json(compact_for_prompt(state.get("global_settings", []), limit=limit))
+
+
+def _prompt_previous_summaries(state: ScriptGraphState, limit: int = PREVIOUS_SUMMARY_PROMPT_LIMIT) -> str:
+    return dump_prompt_json(compact_for_prompt(state.get("previous_chapter_summaries", []), limit=limit))
+
+
+def _prompt_retrieved_memories(state: ScriptGraphState, limit: int = RETRIEVED_MEMORY_PROMPT_LIMIT) -> str:
+    return dump_prompt_json(compact_for_prompt(state.get("retrieved_memories", []), limit=limit))
+
 
 async def background_node(state: ScriptGraphState) -> dict[str, Any]:
     """Extract screen-facing background, setting, and atmosphere notes."""
 
     logger.info("[Background] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
-    output = await invoke_structured(
-        BACKGROUND_PROMPT,
-        BackgroundOutput,
-        {
-            "chapter_title": state.get("chapter_title", ""),
-            "current_chapter": state["current_chapter"],
-            "rolling_summary": state.get("rolling_summary", ""),
-            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
-        },
-        temperature=0.1,
-    )
+    try:
+        output = await invoke_structured(
+            BACKGROUND_PROMPT,
+            BackgroundOutput,
+            {
+                "chapter_title": state.get("chapter_title", ""),
+                "current_chapter": state["current_chapter"],
+                "rolling_summary": _prompt_rolling_summary(state),
+                "global_settings": _prompt_global_settings(state),
+            },
+            temperature=0.1,
+        )
+    except GraphLLMResponseError as exc:
+        logger.warning(
+            "[Background] skipped chapter=%s error=%s",
+            state.get("chapter_title") or state.get("chapter_index"),
+            exc,
+        )
+        output = BackgroundOutput(
+            continuity_risks=[
+                "Background extraction failed for this chapter; skipped archive update.",
+            ]
+        )
     logger.info(
         "[Background] done settings=%d facts=%d",
         len(output.new_settings) + len(output.updated_settings),
@@ -75,19 +121,38 @@ async def character_node(state: ScriptGraphState) -> dict[str, Any]:
     """Extract character archive updates before screenplay generation."""
 
     logger.info("[Character] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
-    output = await invoke_structured(
-        CHARACTER_PROMPT,
-        CharacterOutput,
-        {
-            "chapter_title": state.get("chapter_title", ""),
-            "current_chapter": state["current_chapter"],
-            "rolling_summary": state.get("rolling_summary", ""),
-            "global_characters": dump_prompt_json(
-                compact_for_prompt(state.get("global_characters", []))
-            ),
-        },
-        temperature=0.1,
-    )
+    try:
+        output = await _invoke_character_extractor(
+            state,
+            current_chapter=state["current_chapter"],
+            archive_limit=CHARACTER_PROMPT_ARCHIVE_LIMIT,
+        )
+    except GraphLLMResponseError as exc:
+        logger.warning(
+            "[Character] failed, retrying with compact context chapter=%s error=%s",
+            state.get("chapter_title") or state.get("chapter_index"),
+            exc,
+        )
+        try:
+            output = await _invoke_character_extractor(
+                state,
+                current_chapter=compact_text_for_prompt(
+                    state["current_chapter"],
+                    COMPACT_RETRY_CHAPTER_CHARS,
+                ),
+                archive_limit=8,
+            )
+        except GraphLLMResponseError as retry_exc:
+            logger.warning(
+                "[Character] skipped after compact retry chapter=%s error=%s",
+                state.get("chapter_title") or state.get("chapter_index"),
+                retry_exc,
+            )
+            output = CharacterOutput(
+                continuity_risks=[
+                    "Character extraction failed for this chapter; skipped archive update.",
+                ]
+            )
     logger.info(
         "[Character] done characters=%d",
         len(output.new_characters) + len(output.updated_characters),
@@ -95,23 +160,52 @@ async def character_node(state: ScriptGraphState) -> dict[str, Any]:
     return {"character_notes": output.model_dump()}
 
 
+async def _invoke_character_extractor(
+    state: ScriptGraphState,
+    *,
+    current_chapter: str,
+    archive_limit: int,
+) -> CharacterOutput:
+    return await invoke_structured(
+        CHARACTER_PROMPT,
+        CharacterOutput,
+        {
+            "chapter_title": state.get("chapter_title", ""),
+            "current_chapter": current_chapter,
+            "rolling_summary": _prompt_rolling_summary(state),
+            "global_characters": _prompt_global_characters(state, limit=archive_limit),
+        },
+        temperature=0.1,
+    )
+
+
 async def relationship_node(state: ScriptGraphState) -> dict[str, Any]:
     """Extract relationship and conflict lines in parallel with other analysis."""
 
     logger.info("[Relationship] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
-    output = await invoke_structured(
-        RELATIONSHIP_PROMPT,
-        RelationshipOutput,
-        {
-            "chapter_title": state.get("chapter_title", ""),
-            "current_chapter": state["current_chapter"],
-            "rolling_summary": state.get("rolling_summary", ""),
-            "global_characters": dump_prompt_json(
-                compact_for_prompt(state.get("global_characters", []))
-            ),
-        },
-        temperature=0.1,
-    )
+    try:
+        output = await invoke_structured(
+            RELATIONSHIP_PROMPT,
+            RelationshipOutput,
+            {
+                "chapter_title": state.get("chapter_title", ""),
+                "current_chapter": state["current_chapter"],
+                "rolling_summary": _prompt_rolling_summary(state),
+                "global_characters": _prompt_global_characters(state),
+            },
+            temperature=0.1,
+        )
+    except GraphLLMResponseError as exc:
+        logger.warning(
+            "[Relationship] skipped chapter=%s error=%s",
+            state.get("chapter_title") or state.get("chapter_index"),
+            exc,
+        )
+        output = RelationshipOutput(
+            continuity_risks=[
+                "Relationship extraction failed for this chapter; skipped relationship update.",
+            ]
+        )
     logger.info("[Relationship] done relationships=%d", len(output.relationships))
     return {"relationship_notes": output.model_dump()}
 
@@ -120,20 +214,30 @@ async def casting_node(state: ScriptGraphState) -> dict[str, Any]:
     """Extract casting, styling, and playable trait notes."""
 
     logger.info("[Casting] start chapter=%s", state.get("chapter_title") or state.get("chapter_index"))
-    output = await invoke_structured(
-        CASTING_PROMPT,
-        CastingOutput,
-        {
-            "chapter_title": state.get("chapter_title", ""),
-            "current_chapter": state["current_chapter"],
-            "rolling_summary": state.get("rolling_summary", ""),
-            "global_characters": dump_prompt_json(
-                compact_for_prompt(state.get("global_characters", []))
-            ),
-            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
-        },
-        temperature=0.15,
-    )
+    try:
+        output = await invoke_structured(
+            CASTING_PROMPT,
+            CastingOutput,
+            {
+                "chapter_title": state.get("chapter_title", ""),
+                "current_chapter": state["current_chapter"],
+                "rolling_summary": _prompt_rolling_summary(state),
+                "global_characters": _prompt_global_characters(state),
+                "global_settings": _prompt_global_settings(state),
+            },
+            temperature=0.15,
+        )
+    except GraphLLMResponseError as exc:
+        logger.warning(
+            "[Casting] skipped chapter=%s error=%s",
+            state.get("chapter_title") or state.get("chapter_index"),
+            exc,
+        )
+        output = CastingOutput(
+            continuity_risks=[
+                "Casting extraction failed for this chapter; skipped casting update.",
+            ]
+        )
     logger.info("[Casting] done choices=%d", len(output.choices))
     return {"casting_notes": output.model_dump()}
 
@@ -233,11 +337,9 @@ async def archivist_node(state: ScriptGraphState) -> dict[str, Any]:
         {
             "chapter_title": state.get("chapter_title", ""),
             "current_chapter": state["current_chapter"],
-            "rolling_summary": state.get("rolling_summary", ""),
-            "global_characters": dump_prompt_json(
-                compact_for_prompt(state.get("global_characters", []))
-            ),
-            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
+            "rolling_summary": _prompt_rolling_summary(state),
+            "global_characters": _prompt_global_characters(state),
+            "global_settings": _prompt_global_settings(state),
         },
         temperature=0.1,
     )
@@ -281,16 +383,12 @@ async def screenwriter_node(state: ScriptGraphState) -> dict[str, Any]:
             "chapter_title": state.get("chapter_title", ""),
             "scene_density": state.get("scene_density", 3),
             "current_chapter": state["current_chapter"],
-            "rolling_summary": state.get("rolling_summary", ""),
-            "global_characters": dump_prompt_json(
-                compact_for_prompt(state.get("global_characters", []))
-            ),
-            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
-            "archivist_notes": dump_prompt_json(state.get("archivist_notes", {})),
-            "retrieved_memories": dump_prompt_json(state.get("retrieved_memories", [])),
-            "previous_chapter_summaries": dump_prompt_json(
-                compact_for_prompt(state.get("previous_chapter_summaries", []), limit=30)
-            ),
+            "rolling_summary": _prompt_rolling_summary(state),
+            "global_characters": _prompt_global_characters(state),
+            "global_settings": _prompt_global_settings(state),
+            "archivist_notes": dump_prompt_json(compact_for_prompt(state.get("archivist_notes", {}), limit=12)),
+            "retrieved_memories": _prompt_retrieved_memories(state),
+            "previous_chapter_summaries": _prompt_previous_summaries(state),
             "template_schema": state.get("template_schema", ""),
             "error_msg": state.get("error_msg", ""),
         },
@@ -331,10 +429,8 @@ async def critic_node(state: ScriptGraphState) -> dict[str, Any]:
         CriticOutput,
         {
             "deterministic_report": dump_prompt_json(deterministic_report),
-            "global_characters": dump_prompt_json(
-                compact_for_prompt(state.get("global_characters", []))
-            ),
-            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
+            "global_characters": _prompt_global_characters(state),
+            "global_settings": _prompt_global_settings(state),
             "current_script_data": dump_prompt_json(state.get("current_script_data", {})),
             "current_template_data": dump_prompt_json(state.get("current_template_data", {})),
             "template_schema": state.get("template_schema", ""),
@@ -392,15 +488,11 @@ async def continuity_critic_node(state: ScriptGraphState) -> dict[str, Any]:
             "chapter_index": state.get("chapter_index", 1),
             "chapter_title": state.get("chapter_title", ""),
             "current_chapter": state.get("current_chapter", ""),
-            "rolling_summary": state.get("rolling_summary", ""),
-            "previous_chapter_summaries": dump_prompt_json(
-                compact_for_prompt(state.get("previous_chapter_summaries", []), limit=40)
-            ),
-            "retrieved_memories": dump_prompt_json(state.get("retrieved_memories", [])),
-            "global_characters": dump_prompt_json(
-                compact_for_prompt(state.get("global_characters", []))
-            ),
-            "global_settings": dump_prompt_json(compact_for_prompt(state.get("global_settings", []))),
+            "rolling_summary": _prompt_rolling_summary(state),
+            "previous_chapter_summaries": _prompt_previous_summaries(state),
+            "retrieved_memories": _prompt_retrieved_memories(state),
+            "global_characters": _prompt_global_characters(state),
+            "global_settings": _prompt_global_settings(state),
             "critic_warnings": dump_prompt_json(state.get("critic_warnings", [])),
             "template_schema": state.get("template_schema", ""),
             "current_script_data": dump_prompt_json(state.get("current_script_data", {})),
@@ -482,7 +574,7 @@ async def summarizer_node(state: ScriptGraphState) -> dict[str, Any]:
         SUMMARIZER_PROMPT,
         RollingSummaryOutput,
         {
-            "rolling_summary": state.get("rolling_summary", ""),
+            "rolling_summary": _prompt_rolling_summary(state),
             "chapter_title": state.get("chapter_title", ""),
             "current_script_data": dump_prompt_json(state.get("current_script_data", {})),
             "critic_warnings": dump_prompt_json(state.get("critic_warnings", [])),
@@ -497,7 +589,7 @@ async def summarizer_node(state: ScriptGraphState) -> dict[str, Any]:
     )
 
     return {
-        "rolling_summary": output.rolling_summary,
+        "rolling_summary": compact_text_for_prompt(output.rolling_summary, 1800),
         "archivist_notes": {
             **state.get("archivist_notes", {}),
             "latest_summary_metadata": output.model_dump(),
