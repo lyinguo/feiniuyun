@@ -12,3 +12,45 @@ data/real_book/*.zip
 tests_py/test_epub/
 data/temp_epubs/
 data/
+tests_py/output_scripts/
+
+# ==========================================
+# Vue 前端项目 (novel2script-ui) 过滤规则
+# ==========================================
+
+# Logs
+novel2script-ui/logs
+novel2script-ui/*.log
+novel2script-ui/npm-debug.log*
+novel2script-ui/yarn-debug.log*
+novel2script-ui/yarn-error.log*
+novel2script-ui/pnpm-debug.log*
+novel2script-ui/lerna-debug.log*
+
+# 依赖与编译产物 (最重要，防止把几万个前端包传上去)
+novel2script-ui/node_modules/
+novel2script-ui/dist/
+novel2script-ui/dist-ssr/
+novel2script-ui/coverage/
+novel2script-ui/*.local
+
+# 编辑器配置文件
+novel2script-ui/.vscode/*
+!novel2script-ui/.vscode/extensions.json
+novel2script-ui/.idea/
+novel2script-ui/*.suo
+novel2script-ui/*.ntvs*
+novel2script-ui/*.njsproj
+novel2script-ui/*.sln
+novel2script-ui/*.sw?
+
+novel2script-ui/*.tsbuildinfo
+novel2script-ui/.eslintcache
+
+# 测试框架缓存
+novel2script-ui/cypress/videos/
+novel2script-ui/cypress/screenshots/
+novel2script-ui/__screenshots__/
+
+# Vite 构建临时文件
+novel2script-ui/*.timestamp-*-*.mjs
