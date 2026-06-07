@@ -22,6 +22,10 @@ NovelScriptAI 是一个“前端 + FastAPI 后端 + LangGraph 多 Agent + OpenAI
 
 核心目标不是替代作者完成最终剧本，而是把“从小说段落到可改剧本初稿”的机械工作交给 AI，让作者更快进入二次创作、结构调整和台词打磨。
 
+## 视频演示
+
+【ai小说转剧本】 https://www.bilibili.com/video/BV16ME464Egu/?share_source=copy_web&vd_source=ea2deb3030977806a732ef9a011db4b2
+
 ## 核心功能
 
 - 小说文本转结构化剧本：支持 3 章以上小说文本，按章节或分段生成剧本初稿。
