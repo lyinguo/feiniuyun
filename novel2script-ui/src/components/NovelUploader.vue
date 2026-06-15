@@ -5,7 +5,7 @@ import { parseEpub } from '@/api/backend'
 
 const store = useNovelStore()
 const fileInput = ref(null)
-
+const maxChunkChars = ref(40000)
 // 触发隐藏的原生 file input
 function pickFile() {
   fileInput.value?.click()
@@ -20,7 +20,7 @@ async function handleFileChange(event) {
   store.errorMessage = ''
   try {
     // resp: { status, message, data: <book_metadata>, folder_name }
-    const resp = await parseEpub(file)
+    const resp = await parseEpub(file, maxChunkChars.value)
     store.setNovelFromMetadata(resp.data, resp.folder_name)
   } catch (err) {
     store.errorMessage = err.message ?? '上传失败'
@@ -65,6 +65,19 @@ function loadDemoData() {
 
 <template>
   <section class="uploader">
+    <div class="chunk-setting">
+      <label for="chunkInput">单块字数上限:</label>
+      <input 
+        id="chunkInput"
+        type="number" 
+        v-model="maxChunkChars" 
+        :disabled="store.isLoading"
+        step="1000"
+        min="5000"
+        class="chunk-setting__input"
+        title="设置大章节自动切分的字数阈值"
+      />
+    </div>
     <button class="btn btn--primary" :disabled="store.isLoading" @click="pickFile">
       {{ store.isLoading ? '解析中…' : '上传小说' }}
     </button>
@@ -133,5 +146,28 @@ function loadDemoData() {
   margin-left: auto;
   font-size: 0.8rem;
   color: var(--color-danger);
+}
+/* 🌟 新增：设置框的样式 */
+.chunk-setting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8f9fa;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  font-size: 0.85rem;
+  color: #333;
+}
+.chunk-setting__input {
+  width: 80px;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  outline: none;
+}
+.chunk-setting__input:focus {
+  border-color: #0277bd;
 }
 </style>

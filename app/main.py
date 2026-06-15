@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import health, scripts,epub
+from app.api import health, scripts, epub, script_routes
 from app.config import settings
 
 
@@ -31,7 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(scripts.router)
     app.include_router(epub.router, prefix="/api")
-    
+    app.include_router(script_routes.router, prefix="/api/v1", tags=["剧本转换"])
     root = Path(__file__).resolve().parents[1]
     src_dir = root / "src"
     if src_dir.exists():

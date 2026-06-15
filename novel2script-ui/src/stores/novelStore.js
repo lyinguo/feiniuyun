@@ -43,6 +43,18 @@ export const useNovelStore = defineStore('novel', () => {
   /** 单章异步操作（上传 / 生成）共用的加载与错误状态 */
   const isLoading = ref(false)
   const errorMessage = ref('')
+  // 第二个后端使用
+  const sseState = ref({
+    isStreaming: false,
+    currentProcessingTitle: '', 
+    retrievedCharacters: '',
+    retrievedLocations: '',
+    oldStoryProgress: '', 
+    newStoryProgress: '',
+    rawStreamText: '',
+    reasoningText: '',
+    errorMessage: ''
+  })
 
   // ============ 整本流式生成状态 ============
   const isStreaming = ref(false)
@@ -66,6 +78,7 @@ export const useNovelStore = defineStore('novel', () => {
 
   /** 当前章节的剧本 / 提示从缓存派生（切换章节自动恢复） */
   const currentScript = computed(() => scriptCache.value[currentChapterId.value]?.yaml ?? '')
+  const currentCachedData = computed(() => scriptCache.value[currentChapterId.value] ?? {})
   const diagnostics = computed(() => scriptCache.value[currentChapterId.value]?.diagnostics ?? [])
 
   // ============ Actions ============
@@ -82,18 +95,49 @@ export const useNovelStore = defineStore('novel', () => {
       totalTokens: metadata.total_estimated_tokens ?? 0,
       chapterCount: metadata.chapters?.length ?? 0,
     }
-    chapters.value = (metadata.chapters ?? []).map((ch, index) => ({
-      id: index, // logical_index 可能重复，改用数组下标作稳定唯一 id
-      title: ch.original_title ?? `第 ${index + 1} 章`,
-      logicalIndex: ch.logical_index,
-      charCount: ch.total_char_count ?? 0,
-      estimatedTokens: ch.total_estimated_tokens ?? 0,
-      isChunked: ch.is_chunked ?? false,
-      files: ch.is_chunked
-        ? (ch.chunks ?? []).map((c) => c.file_path)
-        : [ch.file_path].filter(Boolean),
-      status: 'idle',
-    }))
+
+    // 🌟 核心拍平逻辑
+    const rawChapters = metadata.chapters ?? []
+    const flattenedChapters = []
+    let globalIdCounter = 0 // 使用全局自增计数器作为数组下标 ID
+
+    rawChapters.forEach((ch) => {
+      // 如果当前章节被分块了
+      if (ch.is_chunked && ch.chunks && ch.chunks.length > 0) {
+        const totalChunks = ch.chunks.length
+        
+        ch.chunks.forEach((chunk) => {
+          flattenedChapters.push({
+            id: globalIdCounter++, 
+            // 标题拼接，例如："第四章 杀机初现 (1/2)"
+            title: `${ch.original_title ?? '未知章节'} (${chunk.sub_index}/${totalChunks})`,
+            logicalIndex: ch.logical_index,
+            charCount: chunk.char_count ?? 0,
+            estimatedTokens: chunk.estimated_tokens ?? 0,
+            isChunked: false, // 拍平后，它就是一个独立的“纯净章节”了
+            files: [chunk.file_path], // 依然用数组包起来，兼容老的页面渲染逻辑
+            status: 'idle',
+          })
+        })
+      } else {
+        // 如果没有分块，正常推入
+        flattenedChapters.push({
+          id: globalIdCounter++,
+          title: ch.original_title ?? `第 ${ch.logical_index ?? globalIdCounter} 章`,
+          logicalIndex: ch.logical_index,
+          charCount: ch.total_char_count ?? 0,
+          estimatedTokens: ch.total_estimated_tokens ?? 0,
+          isChunked: false,
+          files: [ch.file_path].filter(Boolean),
+          status: 'idle',
+        })
+      }
+    })
+
+    // 赋值给响应式状态
+    chapters.value = flattenedChapters
+
+    // 默认选中拍平后的第一章
     currentChapterId.value = chapters.value[0]?.id ?? null
     scriptCache.value = {}
     errorMessage.value = ''
@@ -106,8 +150,19 @@ export const useNovelStore = defineStore('novel', () => {
   }
 
   /** 保存某章节的生成结果（按章缓存的写入口） */
-  function saveChapterScript(chapterId, { yaml, diagnostics: diags } = {}) {
-    scriptCache.value[chapterId] = { yaml: yaml ?? '', diagnostics: diags ?? [] }
+  function saveChapterScript(chapterId, data = {}) {
+    console.log(`📦 [存入快照] 章节ID: ${chapterId} | 剧本长度: ${data.yaml?.length} | 思考长度: ${data.reasoningText?.length}`);
+    scriptCache.value[chapterId] = { 
+      yaml: data.yaml ?? '', 
+      reasoningText: data.reasoningText ?? '',
+      diagnostics: data.diagnostics ?? [],
+      oldStoryProgress: data.oldStoryProgress ?? '', 
+      newStoryProgress: data.newStoryProgress ?? '',
+      retrievedCharacters: data.retrievedCharacters ?? '',
+      retrievedLocations: data.retrievedLocations ?? '',
+      newCharacters: data.newCharacters ?? '',
+      newLocations: data.newLocations ?? ''
+    }
   }
 
   /** 更新某一章节的状态（生成中 / 完成 / 失败） */
@@ -192,6 +247,7 @@ export const useNovelStore = defineStore('novel', () => {
     userId,
     isLoading,
     errorMessage,
+    sseState,
     isStreaming,
     streamProgress,
     streamCurrentTitle,
@@ -204,6 +260,7 @@ export const useNovelStore = defineStore('novel', () => {
     currentChapter,
     threadId,
     currentScript,
+    currentCachedData,
     diagnostics,
     // actions
     setNovelFromMetadata,
