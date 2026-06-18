@@ -13,7 +13,7 @@ tests_py/test_epub/
 data/temp_epubs/
 data/
 tests_py/output_scripts/
-
+tests_py/chroma_db/
 # ==========================================
 # Vue 前端项目 (novel2script-ui) 过滤规则
 # ==========================================

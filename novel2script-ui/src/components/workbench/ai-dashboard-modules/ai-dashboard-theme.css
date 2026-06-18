@@ -1,0 +1,875 @@
+
+/* 🌟🌟🌟 新增：工业级剧本分镜可视化高阶样式 🌟🌟🌟 */
+.visual-script-mode {
+  background: #fdfdfd;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.scene-group {
+  border: 1px solid #dcdcdc;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+  background: #fff;
+  
+  /* 🌟🌟 核心绝招 2：告诉浏览器，无论内容多长，这个场景卡片绝对不准被压缩变扁！ 🌟🌟 */
+  flex-shrink: 0 !important; 
+}
+
+scene-title-bar {
+  background: #2c3e50;
+  color: #fff;
+  padding: 0.6rem 1rem;
+  font-weight: bold;
+  font-size: 0.92rem;
+}
+
+.scene-summary-box {
+  background: #f8f9fa;
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  color: #666;
+  border-bottom: 1px solid #eef0f3;
+  line-height: 1.6;
+}
+
+.elements-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.element-row {
+  display: flex;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #f5f5f5;
+  align-items: flex-start;
+  gap: 1.5rem;
+  
+  /* 🌟🌟 核心绝招 3：确保每一行对白也拥有完整高度，严禁压缩！ 🌟🌟 */
+  flex-shrink: 0 !important; 
+}
+
+.element-row:last-child {
+  border-bottom: none;
+}
+
+/* 环境描述：灰色底色斜体，烘托舞台感 */
+.environment-row {
+  background: #fafafa;
+  font-style: italic;
+}
+
+.elem-character {
+  /* flex: 0 0 110px;  ❌ 把这行旧的删掉 */
+  
+  /* 🌟🌟【全新自适应升级】🌟🌟 */
+  flex: 0 0 auto;            /* 让盒子大小根据名字的长短自适应撑开 */
+  min-width: 80px;           /* 保底最小宽度，防止一两个字的名字显得太小 */
+  max-width: 160px;          /* 黄金硬上限：名字最长允许撑到 160px，防止无限挤压右侧 */
+  white-space: normal;       /* 🌟 允许长名字自动向下折行，绝对不再变省略号！ */
+  word-break: break-all;     /* 哪怕全是英文或特殊符号，也能精准在边界切断折行 */
+  
+  font-weight: bold; 
+  color: #2c3e50; 
+  font-size: 0.82rem; 
+  background: #e6f7ff;
+  padding: 0.3rem 0.6rem;    /* 稍微加大一点内边距，让换行后的名字更有呼吸感 */
+  border-radius: 4px; 
+  text-align: center; 
+  border: 1px solid #bae7ff;
+}
+
+.environment-row .elem-character {
+  background: #f5f5f5;
+  border-color: #d9d9d9;
+  color: #777;
+}
+
+.elem-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* ======================================================== */
+/* 🎬 终极美化：剧本分镜动作舱与台词气泡流高级设计 */
+/* ======================================================== */
+
+/* 动作描述：高级半透明便签卡 */
+.action-capsule {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: rgba(245, 247, 250, 0.85);
+  border: 1px solid #e4e7ed;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #5a5e66;
+  line-height: 1.5;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.01);
+  margin-bottom: 0.25rem;
+  /* 左侧加一条微弱的暖灰色竖线，增加剧本客观描述的层次 */
+  border-left: 3px solid #909399; 
+}
+
+/* 动作卡专属的小徽章 */
+.capsule-tag {
+  font-size: 0.65rem;
+  background: #909399;
+  color: #ffffff;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  margin-top: 0.1rem;
+}
+
+.capsule-text {
+  flex: 1;
+  font-style: italic; /* 动作指示维持好读的斜体规范 */
+}
+
+/* 对白台词：高纯度、带呼吸感的实体台词舱 */
+.dialogue-bubble {
+  position: relative;
+  background: linear-gradient(135deg, #f0f7ff 0%, #f4f9ff 100%);
+  border: 1px solid #d7e8ff;
+  padding: 0.75rem 1rem;
+  border-radius: 0 12px 12px 12px; /* 经典的现代左上角切空对话框气泡效果 */
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.03);
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* 模拟纸质出版物的悬挂双引号效果，细节的高级感体现 */
+.quote-mark {
+  font-family: "Georgia", serif;
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #1890ff;
+  line-height: 1;
+  margin-top: -0.2rem;
+  user-select: none;
+}
+
+.bubble-text {
+  flex: 1;
+  color: #1a1a1a;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.3px;
+}
+
+/* 【环境】专属行在高级模式下的联动淡化 */
+.environment-row .dialogue-bubble {
+  background: #ffffff;
+  border-color: #e8e8e8;
+  box-shadow: none;
+}
+
+.environment-row .quote-mark {
+  color: #bfbfbf;
+}
+
+/* ======================================================== */
+/* 以下为你原本百分之百原汁原味的 CSS 样式，无任何变动 */
+/* ======================================================== */
+/* 🌟 新增：仅仅追加了这几个对齐左右面板的弹性容器样式，其余完全不动 */
+.story-progress-container {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.story-progress-container .progress-card {
+  flex: 1; /* 左右各自平分 50% 宽度，完美工整 */
+}
+
+.input-text {
+  color: #c0392b; /* 保持你原本的深红前情提要色 */
+}
+
+.output-text {
+  color: #0f5132; /* 本章新总结概述：用优雅的生机绿作视觉区分 */
+  font-weight: 500;
+}
+
+/* ======================================================== */
+/* 以下为你原本百分之百原汁原味的 CSS 样式，无任何变动 */
+/* ======================================================== */
+.preview-panel {
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.ai-dashboard {
+  flex: 1.3; 
+  background: #f0f2f5;
+  padding: 1rem;
+  gap: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.error-banner {
+  background: #ffebee;
+  color: #c62828;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-weight: bold;
+  border: 1px solid #ffcdd2;
+}
+.ai-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border: 1px solid #e8e8e8;
+}
+.script-card {
+  min-height: 480px;
+  max-height: 700px; 
+  display: flex;         /* 必须是 flex 布局，才能让内胆自适应 */
+  flex-direction: column;
+  overflow: hidden;      /* 外壳隐藏溢出，防止撑爆整个网页大页面 */
+}
+.ai-card__header {
+  padding: 0.75rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #262626;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.script-body-scroll-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: #fdfdfd;
+  
+  /* 🌟🌟 核心绝招 1：激活局部物理滚动条 🌟🌟 */
+  overflow-y: auto !important; /* 强制允许纵向滚动查看所有场景 */
+}
+.ai-card__body {
+  padding: 1rem;
+  font-size: 0.85rem;
+  color: #434343;
+  line-height: 1.6;
+}
+.script-body {
+  overflow-y: auto;
+  max-height: 600px;
+}
+.new-memory-container {
+  display: flex;
+  gap: 1rem;
+}
+.memory-section {
+  flex: 1;
+}
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}
+.lines-content {
+  background: #fafafa;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #f0f0f0;
+  margin-top: 0.25rem;
+}
+.json-text {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  color: #0b5ed7;
+  font-size: 0.82rem;
+}
+.highlight-text {
+  color: #c0392b;
+  font-weight: 500;
+}
+.empty-state {
+  color: #bfbfbf;
+  font-style: italic;
+  font-size: 0.82rem;
+}
+.streaming-indicator {
+  width: 9px;
+  height: 9px;
+  background-color: #52c41a;
+  border-radius: 50%;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+
+/* ======================================================== */
+/* 💎 终极美化：本章节新长期记忆高级穿梭卡片样式 */
+/* ======================================================== */
+
+/* 头部小标签 */
+.advanced-badge {
+  font-size: 0.7rem;
+  background: #f0f5ff;
+  color: #1d39c4;
+  border: 1px solid #adc6ff;
+  padding: 0.1rem 0.4rem;
+  border-radius: 12px;
+  text-transform: uppercase;
+  font-family: monospace;
+}
+
+/* 左右双子星大底盘 */
+.new-memory-container {
+  display: flex;
+  gap: 1.25rem;
+  padding: 1.25rem !important;
+  background: #fafafa;
+}
+
+/* 微缩穿梭盒子基础外观 */
+.memory-meta-box {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #eef1f6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.memory-meta-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* 人物盒左侧装饰条，用高级的典雅紫 */
+.character-meta {
+  border-left: 4px solid #722ed1;
+}
+
+/* 场所盒左侧装饰条，用高级的科技蓝 */
+.location-meta {
+  border-left: 4px solid #13c2c2;
+}
+
+/* 盒子内部的小标题栏 */
+.meta-box__title {
+  padding: 0.6rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #434343;
+  background: linear-gradient(to right, #ffffff, #fafafa);
+  border-bottom: 1px solid #f0f2f5;
+}
+
+/* 盒子内部文本展示区 */
+.meta-box__content {
+  padding: 0.75rem;
+  font-size: 0.82rem;
+  color: #262626;
+  line-height: 1.6;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem; /* 🌟 控制每个独立卡片之间的上下呼吸间距 */
+}
+.meta-capsule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: #fafbfc;
+  border: 1px solid #eef2f6;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01);
+  transition: all 0.2s ease;
+}
+.meta-capsule-item:hover {
+  background: #ffffff;
+  border-color: #dcdcdc;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+/* 左侧优雅的小前缀图标，拉满专案组绝密档案的颗粒感 */
+.meta-bullet-icon {
+  color: #8c8c8c;
+  font-size: 0.75rem;
+  margin-top: 0.1rem;
+  user-select: none;
+}
+
+/* 关联左侧不同卡片的主题色 */
+.character-meta .meta-bullet-icon { color: #722ed1; } /* 人物用紫色十字星 */
+.location-meta .meta-bullet-icon { color: #13c2c2; }  /* 场所用蓝色十字星 */
+
+/* 框内文本排版，彻底干掉 pre 标签自带的间距毛刺 */
+.meta-capsule-text {
+  margin: 0;
+  flex: 1;
+  color: #434343;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-family: inherit;
+}
+/* 增强文本包裹器排版，去除原生 pre 的生硬感 */
+.meta-text-wrapper {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #fdfdfd;
+  padding: 0.6rem;
+  border-radius: 4px;
+  border: 1px dashed #e8e8e8;
+  color: #595959;
+  font-family: inherit;
+}
+
+/* 🚀 炫酷的实时生成状态加载条（含呼吸灯动画） */
+.meta-status-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #8c8c8c;
+  font-style: italic;
+  margin: auto 0;
+  font-size: 0.8rem;
+}
+
+/* 呼吸灯圆点 */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #722ed1;
+  border-radius: 50%;
+  position: relative;
+  animation: pulse-purple 1.5s infinite ease-in-out;
+}
+
+.pulse-dot.blue {
+  background-color: #13c2c2;
+  animation: pulse-blue 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-purple {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(114, 46, 209, 0.4); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(114, 46, 209, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(114, 46, 209, 0); }
+}
+
+@keyframes pulse-blue {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(19, 194, 194, 0.4); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(19, 194, 194, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(19, 194, 194, 0); }
+}
+/* ======================================================== */
+/* 💎 终极美化：前情提要与新概述高级工作流面板 */
+/* ======================================================== */
+
+/* 大标题栏下面的英文微缩功能小标签 */
+.header-sub-tag {
+  font-size: 0.68rem;
+  color: #8c8c8c;
+  font-family: monospace;
+  margin-left: 0.5rem;
+  font-weight: 400;
+}
+.header-sub-tag.text-green { color: #52c41a; }
+
+/* 卡片内部容器 */
+.progress-card-body {
+  padding: 0.85rem !important;
+  background: #fafbfc;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- 1. 左侧：前情提要（冷冽绝密档案质感） --- */
+.blueprint-card-inner {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #64748b; /* 用冷峻的深灰蓝作为历史沉淀色 */
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.01);
+  overflow: hidden;
+  flex: 1;
+}
+
+/* 带有怀旧机械感的隐藏数字水印水印 */
+.blueprint-stamp {
+  position: absolute;
+  right: -5px;
+  bottom: -8px;
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 1.8rem;
+  color: rgba(100, 116, 139, 0.05);
+  letter-spacing: 2px;
+  user-select: none;
+  font-style: italic;
+}
+
+.blueprint-paragraph {
+  margin: 0;
+  color: #334155; /* 冷调深灰色，适合大量阅读不刺眼 */
+  font-size: 0.82rem;
+  line-height: 1.6;
+  font-weight: 500;
+  text-align: justify;
+}
+
+/* --- 2. 右侧：新剧本概述（晶体霓虹生机绿） --- */
+.neon-ledger-inner {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e6f4ea;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(82, 196, 26, 0.02);
+  flex: 1;
+}
+
+/* 顶部的晶体极光环境线条，拉满大模型生生不息的繁衍感 */
+.ledger-glow-bar {
+  position: absolute;
+  top: -1px; left: 15px; right: 15px; height: 3px;
+  background: linear-gradient(to right, #52c41a, #a0d911);
+  border-radius: 10px;
+}
+
+.ledger-paragraph {
+  margin: 0;
+  color: #135200; /* 生机盎然的极深暗绿，极富高级墨水感 */
+  font-size: 0.82rem;
+  line-height: 1.6;
+  font-weight: 600; /* 突出新生成的重点 */
+}
+
+/* --- 3. 辅助组件：现代版空状态与极速流加载条 --- */
+.empty-state-modern {
+  color: #bfbfbf;
+  font-style: italic;
+  font-size: 0.8rem;
+  margin: auto;
+  text-align: center;
+}
+
+.progress-status-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: #8c8c8c;
+  font-size: 0.8rem;
+  margin: auto;
+}
+
+/* 小型的无极变速旋转器（用于左侧前情提要） */
+.spinner-mini {
+  width: 14px; height: 14px;
+  border: 2px solid #d9d9d9;
+  border-top-color: #64748b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 右侧新概述专属的文字呼吸指示灯 */
+.text-italic-light {
+  font-style: italic;
+  color: #73d13d;
+  animation: text-pulse 2s infinite ease-in-out;
+}
+
+@keyframes text-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* 右上角状态呼吸小圆点 */
+.pulse-indicator-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+}
+.pulse-indicator-dot.static-gray { background-color: #bfbfbf; }
+.pulse-indicator-dot.breathing-green {
+  background-color: #52c41a;
+  box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.4);
+  animation: dot-pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes dot-pulse {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.5); }
+  70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(82, 196, 26, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(82, 196, 26, 0); }
+}
+/* ======================================================== */
+/* 💎 升级版：RAG 长期记忆最顶层 Fixed 穿梭弹窗样式 */
+/* ======================================================== */
+
+.font-orange { color: #fa8c16 !important; border-color: #ffd591 !important; background: #fff7e6 !important; }
+
+.memory-matrix-container { display: flex; gap: 1.25rem; padding: 1rem !important; background: #f8fafc; }
+.memory-matrix-box { flex: 1; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; }
+.matrix-box__title { padding: 0.6rem 0.8rem; font-size: 0.82rem; font-weight: 600; color: #475569; background: linear-gradient(to right, #ffffff, #f1f5f9); border-bottom: 1px solid #e2e8f0; }
+.matrix-box__content { padding: 0.85rem; min-height: 80px; }
+.matrix-grid { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+/* 基础卡片 */
+.entity-block-card {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: #f3e8ff; border: 1px solid #d8b4fe; padding: 0.5rem 0.8rem; border-radius: 6px;
+  cursor: pointer; user-select: none; transition: all 0.2s ease;
+}
+.entity-block-card.location-theme { background: #e0f2fe; border-color: #bae6fd; }
+
+/* 🌟 卡片被点击激活时的耀眼高亮状态 */
+.is-active-card { background: #722ed1 !important; border-color: #5b21b6 !important; }
+.is-active-card .entity-name-text { color: #ffffff !important; }
+.is-active-card-loc { background: #0284c7 !important; border-color: #0369a1 !important; }
+.is-active-card-loc .entity-name-text { color: #ffffff !important; }
+
+.entity-count-badge { font-size: 0.7rem; background: rgba(255, 255, 255, 0.7); padding: 0.05rem 0.3rem; border-radius: 10px; color: #6b21a8; font-weight: 500; }
+.location-theme .entity-count-badge { color: #0369a1; }
+.entity-name-text { font-size: 0.82rem; font-weight: 600; color: #1e1b4b; }
+
+/* 🌟🌟🌟 核心：彻底重构为顶层 Fixed 遮罩弹视窗 🌟🌟🌟 */
+.entity-tooltip-popover {
+  position: fixed;
+  z-index: 999999 !important;
+  width: 420px;
+  background: #1e293b;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(255, 255, 255, 0.1);
+  padding: 0.85rem;
+  border: 1px solid #334155;
+  
+  /* 🌟 追加这一行：允许鼠标指针在弹出框内部自由活动和点击滚动，绝对不穿透 */
+  pointer-events: auto !important; 
+  
+  animation: popover-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popover-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tooltip-header { font-size: 0.8rem; font-weight: bold; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; margin-bottom: 0.6rem; }
+.tooltip-body-scroll { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 0.25rem; }
+.tooltip-detail-item { font-size: 0.78rem; color: #cbd5e1; line-height: 1.6; text-align: justify; }
+.tooltip-bullet { color: #38bdf8; font-size: 0.65rem; margin-right: 0.15rem; }
+.tooltip-body-scroll::-webkit-scrollbar { width: 4px; }
+.tooltip-body-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+/* ======================================================== */
+/* 💎 终极美化：剧本正文多模态切换按钮组与极客代码终端 */
+/* ======================================================== */
+
+.header-left-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 按钮组外层小甲盘 */
+.script-mode-selector {
+  display: flex;
+  background: #f0f2f5;
+  padding: 0.2rem;
+  border-radius: 6px;
+  border: 1px solid #e8e8e8;
+}
+
+/* 按钮基础质感：轻薄扁平化 */
+.mode-btn {
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #595959;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.mode-btn:hover {
+  color: #1890ff;
+}
+
+/* 🌟 被点亮激活时的实体按钮样式（带有高级悬浮投影） */
+.is-active-btn {
+  background: #ffffff !important;
+  color: #1890ff !important;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* 后三种数据形式对应的极客暗色代码终端面板 */
+.code-terminal-panel {
+  flex: 1;
+  background: #1e1e1e; /* 纯正的高级暗黑极客代码背景 */
+  border-radius: 6px;
+  padding: 1rem;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+  overflow-x: auto;
+  border: 1px solid #2d2d2d;
+  box-sizing: border-box;
+}
+
+/* TXT 模式单独采用更护眼、更古典的文学羊皮纸色，提升纯阅读体验 */
+.txt-paper-theme {
+  background: #fcfaf2 !important;
+  border-color: #f4f0e0 !important;
+  box-shadow: none !important;
+}
+
+.terminal-pre-box {
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Consolas', 'Fira Code', monospace; /* 强制程序员等宽字体 */
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: #d4d4d4; /* 🌟 新增：兜底浅灰色，防止暗色模式下非高亮文本（如注释/空白）变黑隐形 */
+  white-space: pre-wrap;
+  overflow-wrap: break-word; /* 🌟 优化：用优雅的单词级换行代替粗暴的 break-all */
+}
+
+/* 调色盘 */
+.json-theme-color { color: #9cdcfe; } /* 科技天青色 */
+.yaml-theme-color { color: #ce9178; } /* 暖秋土橙色 */
+
+.txt-theme-color { 
+  color: #2c3e50 !important; 
+  font-family: "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.88rem;
+}
+.mini-loading {
+  margin-top: 0.5rem !important;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #f0f0f0;
+  font-size: 0.76rem !important;
+}
+.trace-capsule-btn {
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
+  padding: 2px 10px;
+  color: #666;
+  cursor: pointer;
+  margin-left: 12px;
+  transition: all 0.2s;
+}
+.trace-capsule-btn:hover {
+  background: #ffc107;
+  color: #fff;
+  border-color: #ffc107;
+}
+/* 下载按钮旁边的分割线 */
+.btn-divider {
+  color: #ccc;
+  margin: 0 4px;
+  font-size: 14px;
+}
+
+/* 下载按钮的专属高亮样式 */
+.btn-download {
+  color: #0277bd;
+  font-weight: bold;
+  background-color: #e1f5fe;
+  border-color: #81d4fa;
+}
+
+.btn-download:hover {
+  background-color: #b3e5fc;
+  color: #01579b;
+}
+
+/* ==========================================
+    🌟 新增：深度思考胶囊样式
+    ========================================== */
+.header-left-title {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* 让标题和思考胶囊之间有空隙 */
+  position: relative; /* 为悬浮面板提供定位基准 */
+}
+
+.reasoning-module {
+  position: relative;
+}
+
+/* 单行胶囊按钮 */
+.reasoning-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  font-size: 0.8rem;
+  color: #4b5563;
+  width: 220px; /* 🌟 锁定胶囊总宽度 */
+  justify-content: flex-start;
+}
+
+.reasoning-pill:hover {
+  background: #e5e7eb;
+}
+
+.snippet-text {
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: monospace;
+  width: 155px; /* 🌟 锁定内部跳动文字的宽度，防止撑开胶囊 */
+  display: inline-block;
+}
+
+/* 展开的下拉悬浮面板 */
+.reasoning-panel {
+  position: absolute;
+  top: calc(100% + 8px); /* 悬浮在胶囊正下方 */
+  left: 0;
+  width: 450px; /* 面板宽度 */
+  max-height: 350px;
+  overflow-y: auto;
+  background: #fafafa;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #6b7280;
+  white-space: pre-wrap;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 100; /* 悬浮在剧本内容之上 */
+  font-family: inherit;
+  border-left: 3px solid #9ca3af;
+}

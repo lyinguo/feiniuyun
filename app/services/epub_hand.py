@@ -77,12 +77,12 @@ def split_text_no_overlap(text, max_chars):
         
     return chunks
 
-def process_epub_to_dataset(epub_path, output_dir):
+def process_epub_to_dataset(epub_path, output_dir, max_chars_per_chunk=30000):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     TOKEN_MULTIPLIER = 1.2         # 字符到 Token 的估算乘数
-    CONTEXT_WINDOW_LIMIT = 100000  
-    print(f"正在读取文件: {epub_path}")
+    CONTEXT_WINDOW_LIMIT = max_chars_per_chunk  
+    print(f"正在读取文件: {epub_path} | 分块字数限制: {max_chars_per_chunk}")
     book = epub.read_epub(epub_path)
     
     total_book_char_count = 0
@@ -188,4 +188,4 @@ def process_epub_to_dataset(epub_path, output_dir):
 if __name__ == "__main__":
     TARGET_EPUB = "../data/real_book/静默的铁证(米烛光著).epub" 
     OUTPUT_FOLDER = "./test_epub"
-    process_epub_to_dataset(TARGET_EPUB, OUTPUT_FOLDER)
+    process_epub_to_dataset(TARGET_EPUB, OUTPUT_FOLDER, max_chars_per_chunk=20000)

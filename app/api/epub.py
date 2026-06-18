@@ -1,11 +1,11 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Form
 import shutil
 import os
 
 router = APIRouter()
 
 @router.post("/parse-epub")
-async def parse_epub_endpoint(file: UploadFile = File(...)):
+async def parse_epub_endpoint(file: UploadFile = File(...), max_chars: int = Form(20000)):
     try:
         from app.services.epub_hand import process_epub_to_dataset # 引入你的函数
 
@@ -22,7 +22,7 @@ async def parse_epub_endpoint(file: UploadFile = File(...)):
         output_dir = os.path.join(base_dir, folder_name)
 
         # 3. 调用你的处理函数！它会返回那串极其详尽的 metadata
-        book_metadata = process_epub_to_dataset(file_path, output_dir)
+        book_metadata = process_epub_to_dataset(file_path, output_dir, max_chars_per_chunk=max_chars)
 
         # 4. 把统计结果直接返回给前端浏览器
         return {

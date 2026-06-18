@@ -62,9 +62,12 @@ function ensureEpubOk(payload) {
  * @returns {Promise<{ status, message, data, folder_name }>}
  *   data 为 book_metadata（含 book_title / total_char_count / chapters[]）
  */
-export async function parseEpub(file) {
+export async function parseEpub(file, maxChars = 20000) {
   const form = new FormData()
   form.append('file', file)
+  // 🌟 新增：把用户设置的字数一并塞进表单里发送
+  form.append('max_chars', maxChars) 
+  
   const payload = await request('/parse-epub', { method: 'POST', body: form })
   return ensureEpubOk(payload)
 }
