@@ -44,7 +44,7 @@ def create_chat_llm(*, temperature: float | None = None, max_tokens: int | None 
         raise GraphLLMConfigurationError(
             "langchain_openai is not installed. Install the LangChain dependencies first."
         ) from exc
-
+    # print("启动")
     return ChatOpenAI(
         model=settings.llm_model,
         api_key=settings.llm_api_key,
@@ -53,6 +53,7 @@ def create_chat_llm(*, temperature: float | None = None, max_tokens: int | None 
         timeout=settings.llm_timeout_seconds,
         max_retries=settings.llm_max_retries,
         max_tokens=max_tokens or settings.llm_max_tokens,
+        streaming=True,
     )
 
 

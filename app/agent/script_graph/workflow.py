@@ -168,6 +168,7 @@ async def run_chapter(
     template_schema: str | None = None,
     scene_density: int = 3,
     max_retries: int = 2,
+    send_event_callback=None,
 ) -> ScriptGraphState:
     """Run the compiled graph for one chapter."""
 
@@ -201,7 +202,76 @@ async def run_chapter(
         scene_density=scene_density,
         max_retries=max_retries,
     )
-    result: ScriptGraphState = await app.ainvoke(state)
+
+    # 🟢 替换为流式新代码：
+    final_state = None
+    allowed_agents = [
+        "background", "character", "relationship", "casting", 
+        "screenwriter", 
+        "critic", "continuity_critic", "summarizer" # 👈 新增这三个
+    ]
+    async for event in app.astream_events(state, version="v2"):
+        # print("进入判断")
+        kind = event["event"]
+        node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
+        if kind == "on_chain_start" and node_name in allowed_agents:
+            # print("进入判断1")
+            if send_event_callback:
+                send_event_callback({"type": "agent_start", "agent": node_name})
+
+        # 拦截 2：大模型正在流式输出
+        elif kind == "on_chat_model_stream":
+            # print("进入判断2")
+            chunk = event["data"]["chunk"]
+            
+            # 1. 拦截所有模型的深度思考 (Reasoning)
+            reasoning = getattr(chunk, "reasoning_content", None) or getattr(chunk.message, "reasoning_content", None) if hasattr(chunk, "message") else None
+            # print(reasoning, end="", flush=True) 
+            if reasoning and send_event_callback:
+                
+                send_event_callback({
+                    "type": "reasoning",
+                    "agent": node_name,  # 可能是 background, character, screenwriter 等任何一个
+                    "content": reasoning
+                })
+                
+            # 2. 拦截正文输出 (Token)
+            content = chunk.content
+            if not content and hasattr(chunk, "tool_call_chunks") and chunk.tool_call_chunks:
+                content = chunk.tool_call_chunks[0].get("args", "")
+            # print(content, end="", flush=True) 
+            if content and send_event_callback:
+                # 如果你依然觉得前端展示 JSON 碎片太丑，就只保留 screenwriter。
+                if node_name in allowed_agents:
+                    
+                    send_event_callback({
+                        "type": "token",
+                        "agent": node_name,
+                        "content": content
+                    })
+
+        # elif kind == "on_chain_end" and not event.get("name"):
+        elif kind == "on_chain_end" :
+            event_name = event.get("name")
+            if event_name == "LangGraph":
+                print("翻页")
+                final_state = event["data"]["output"]
+                if send_event_callback:
+                    send_event_callback({
+                        "type": "chapter_done", # 专门定义一个新类型：章节完成
+                        "unit_index": chapter.index-1 # 告诉前端是哪一章完成了
+                    })
+            # final_state = event["data"]["output"]
+            elif event_name in allowed_agents:
+                if send_event_callback:
+                    send_event_callback({
+                        "type": "agent_done", # 👈 发送完成信号！
+                        "agent": node_name
+                    })
+
+    # 🌟 关键桥梁：把流式跑完的最终状态，无缝无感地还给原有的 result 变量
+    result: ScriptGraphState = final_state
+
     if user_id and book_title:
         docs_written = vector_story_memory.add_graph_extracts(
             user_id=user_id,

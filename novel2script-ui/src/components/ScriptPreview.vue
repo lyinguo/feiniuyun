@@ -1,13 +1,17 @@
 <script setup>
 import { ref, watch, computed, provide, inject } from 'vue'
 import { useNovelStore } from '@/stores/novelStore'
+import { useAgentStore } from '@/stores/agentStore'
 import { getChapter, convertNovel } from '@/api/backend'
 import { downloadText, safeFilename } from '@/utils/download'
 import { useNovelStream } from '@/composables/useNovelStream'
+import { useAgentStream } from '@/composables/useAgentStream'
 import NovelViewer from '@/components/workbench/NovelViewer.vue'
 import AiDashboard from '@/components/workbench/AiDashboard.vue'
+import LegacyScriptViewer from '@/components/workbench/LegacyScriptViewer.vue'
 
 const store = useNovelStore()
+const agentStore = useAgentStore()
 // const activeSourceRange = ref([])
 
 // 1. 分别记录“悬停”和“锁定”的状态
@@ -61,17 +65,22 @@ function toggleViewMode() {
 const chapterText = ref('')
 const isFetchingText = ref(false)
 
-// ========== 老模式状态 ==========
-const legacyScript = computed(() => store.currentScript || '')
 
 // ========== 新版流式引擎（通过 composable 接管）==========
-const { displayData, startStream, stopStream} = useNovelStream(store)
+// const { displayData, startStream, stopStream} = useNovelStream(store)
+const { displayData, startStream: startOldStream, stopStream: stopOldStream } = useNovelStream(store)
+const { startStream: startAgentStream, stopStream: stopAgentStream } = useAgentStream()
 const handleStop = () => {
   if (confirm('确定要强行停止当前的剧本生成任务吗？')) {
-    stopStream() // 核心：切断长连接
-    store.sseState.isStreaming = false // 修改底座状态，让打字机和动画停下来
-    store.sseState.currentProcessingTitle = '任务已被手动停止'
-    console.log('🛑 用户手动触发了强行停止按钮！')
+    if (viewMode.value === 'legacy') {
+      stopAgentStream() // 停掉新后端
+    } else{
+      stopOldStream() // 核心：切断长连接
+      store.sseState.isStreaming = false // 修改底座状态，让打字机和动画停下来
+      store.sseState.currentProcessingTitle = '任务已被手动停止'
+      // console.log('🛑 用户手动触发了强行停止按钮！')
+    }
+    
   }
 }
 // ========== 监听章节点击加载原文 ==========
@@ -97,34 +106,16 @@ watch(
   },
   { immediate: true }
 )
-
 // ========== 统一生成入口 ==========
 async function handleGenerate() {
   if (viewMode.value === 'legacy') {
     // 老模式：单章接口不变
-    const chapter = store.currentChapter
-    if (!chapter || !chapterText.value) return
-    store.isLoading = true
-    store.errorMessage = ''
-    store.updateChapterStatus(chapter.id, 'generating')
-    try {
-      const resp = await convertNovel({
-        user_id: store.userId,
-        thread_id: store.threadId,
-        novel_text: chapterText.value,
-        title: chapter.title
-      })
-      store.saveChapterScript(chapter.id, {
-        yaml: resp.data?.yaml ?? '',
-        diagnostics: []
-      })
-      store.updateChapterStatus(chapter.id, 'done')
-    } catch (err) {
-      store.errorMessage = err.message ?? '生成失败'
-      store.updateChapterStatus(chapter.id, 'error')
-    } finally {
-      store.isLoading = false
+    if (!store.folderName) {
+      store.sseState.errorMessage = '请先在上方上传 EPUB 小说后再进行生成！'
+      return
     }
+    // 直接启动新流式后端
+    startAgentStream(store.folderName)
   } else {
     store.sseState.rawStreamText = ''
     store.sseState.oldStoryProgress = ''
@@ -140,7 +131,7 @@ async function handleGenerate() {
       store.sseState.errorMessage = '请先在上方上传 EPUB 小说后再进行整本生成！'
       return
     }
-    startStream(store.folderName)
+    startOldStream(store.folderName)
   }
 }
 // ========== 状态指示器计算 ==========
@@ -204,7 +195,7 @@ const engineStatusInfo = computed(() => {
         </button>
         <button
           class="btn btn--primary"
-          :disabled="isFetchingText || store.isLoading || store.sseState.isStreaming"
+          :disabled="isFetchingText || store.isLoading || store.sseState.isStreaming || agentStore.isStreaming"
           @click="handleGenerate"
         >
           <span v-if="viewMode === 'legacy'">
@@ -215,7 +206,7 @@ const engineStatusInfo = computed(() => {
           </span>
         </button>
         <button 
-          v-if="store.sseState.isStreaming"
+          v-if="store.sseState.isStreaming || agentStore.isStreaming"
           @click="handleStop" 
           class="btn btn-stop"
         >
@@ -225,24 +216,22 @@ const engineStatusInfo = computed(() => {
     </header>
 
     <div class="script-preview__body">
-      <!-- 左侧原文：笨组件 -->
-      <NovelViewer :chapterText="chapterText" />
+      <div class="layout-left">
+        <NovelViewer :chapterText="chapterText" />
+      </div>
+      
 
       <!-- 老版剧本预览 -->
-      <div v-if="viewMode === 'legacy'" class="preview-panel script-panel">
-        <div class="panel-header">剧本预览 (老版单章接口)</div>
-        <div class="panel-content">
-          <pre v-if="legacyScript" class="text-content script-text">{{ legacyScript }}</pre>
-          <div v-else class="empty-state">等待点击右上角「单章生成剧本」...</div>
-        </div>
-      </div>
+      <div class="layout-right">
+        <LegacyScriptViewer v-if="viewMode === 'legacy'" />
 
-      <!-- 新版四宫格：笨组件 -->
-      <AiDashboard
-        v-else
-        :displayData="displayData"
-        :errorMessage="store.sseState.errorMessage"
-      />
+        <!-- 新版四宫格：笨组件 -->
+        <AiDashboard
+          v-else
+          :displayData="displayData"
+          :errorMessage="store.sseState.errorMessage"
+        />
+      </div>
     </div>
   </section>
 </template>
@@ -338,35 +327,6 @@ const engineStatusInfo = computed(() => {
   display: flex;
   overflow: hidden;
 }
-/* 老版右侧面板的简单样式（如果需要） */
-.preview-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-.script-panel {
-  border-left: 1px solid #e0e0e0;
-}
-.panel-header {
-  padding: 0.75rem 1.25rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-}
-.panel-content {
-  padding: 1.25rem;
-  overflow-y: auto;
-}
-.text-content {
-  line-height: 1.8;
-}
-.empty-state {
-  color: #bfbfbf;
-  font-style: italic;
-  font-size: 0.82rem;
-}
 /* 停止按钮专用制服：危险警示红 */
 .btn-stop {
   background-color: #fff1f0;
@@ -379,5 +339,18 @@ const engineStatusInfo = computed(() => {
   color: #fff;
   border-color: #cf1322;
 }
+/* 🌟 新增：左侧面板占 4 份 (40%) */
+.layout-left {
+  flex: 4;
+  display: flex; /* 让内部的 NovelViewer 撑满高度 */
+  overflow: hidden;
+  border-right: 1px solid #e0e0e0; /* 加上一条灰色的分割线，视觉更清晰 */
+}
 
+/* 🌟 新增：右侧面板占 6 份 (60%) */
+.layout-right {
+  flex: 6;
+  display: flex; /* 让内部的 Viewer 或 Dashboard 撑满高度 */
+  overflow: hidden;
+}
 </style>

@@ -165,13 +165,18 @@ class VectorStoryMemory:
             self.backend = "json"
 
     def _add_chroma(self, namespace: str, items: list[VectorMemoryDocument]) -> int:
+        # 🌟 核心改动：使用字典根据 doc_id 自动进行合并去重（后出现的覆盖先出现的）
+        unique_items = {}
+        for item in items:
+            doc_id = self._doc_id(namespace, item)
+            unique_items[doc_id] = item
+        
         ids: list[str] = []
         documents: list[str] = []
         metadatas: list[dict[str, Any]] = []
         embeddings: list[list[float]] = []
 
-        for item in items:
-            doc_id = self._doc_id(namespace, item)
+        for doc_id, item in unique_items.items():
             ids.append(doc_id)
             documents.append(item.text)
             metadatas.append(self._metadata(namespace, item))

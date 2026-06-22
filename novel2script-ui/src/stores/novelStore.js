@@ -40,6 +40,9 @@ export const useNovelStore = defineStore('novel', () => {
    */
   const userId = ref('web_user')
 
+
+
+
   /** 单章异步操作（上传 / 生成）共用的加载与错误状态 */
   const isLoading = ref(false)
   const errorMessage = ref('')
