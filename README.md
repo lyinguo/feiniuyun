@@ -1,48 +1,59 @@
-# NovelScriptAI：AI 小说转剧本工具
+# 🎬 Novel2Script_AI (智能剧本工坊)
 
-## 题目背景
+[![Vue Version](https://img.shields.io/badge/Vue-3.x-4fc08d?style=flat-square&logo=vuedotjs)](https://vuejs.org/)[![Vite Version](https://img.shields.io/badge/Vite-5.x-646cff?style=flat-square&logo=vite)](https://vitejs.dev/)[![Pinia](https://img.shields.io/badge/State-Pinia-94a3b8?style=flat-square)](https://pinia.vuejs.org/)[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)[![Python Version](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)[![ChromaDB](https://img.shields.io/badge/VectorDB-ChromaDB-FFA500?style=flat-square)](https://www.trychroma.com/)[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)[![OpenAI](https://img.shields.io/badge/LLM-OpenAI-412991?style=flat-square&logo=openai&logoColor=white)](https://openai.com/)
+> **语言版本 / Languages:** [简体中文](./README.md) | [English](./docs/README-en.md)
 
-题目三：AI 小说转剧本工具
+`Novel2Script_AI` 是一款 **AI 原生代工业级编剧工作站**。系统基于大语言模型（LLM）与向量数据库（ChromaDB）的 RAG 召回技术，能够将长篇小说全自动、高颗粒度地解构并重塑为符合电影工业规范的标准分镜头脚本。
 
-很多小说作者希望将自己的作品改编成剧本。本项目开发了一款 AI 辅助剧本创作工具，用于降低小说改编门槛、提升剧本初稿生产效率。
+项目依然处于优化阶段，有好的想法可以在Issues中进行留言。
 
-题目要求：
+---
+## 🖥️ 界面预览
+![少Token消耗看板1](docs/images/1.png)
+![少Token消耗看板2](docs/images/2.png)
+![多Agent看板](docs/images/Long_Agent_demo.png)
+## 🚀 核心功能亮点
+项目核心围绕 **「双层 AI 记忆模型」** 与 **「工业级分镜」** 展开，从根本上解决大语言模型（LLM）在长篇小说改编剧本时面临的“上下文遗忘、剧情跑偏、格式混乱”等行业痛点。
 
-- 能将 3 个章节以上的小说文本自动转换为结构化剧本。
-- 输出格式为 YAML，便于作者继续编辑和打磨。
-- 额外提供 YAML Schema 文档，并说明 Schema 的设计原因。
+用户可以上传或粘贴小说文本，系统会按章节/分段逐步调用大模型，将小说内容转换为可编辑的剧本初稿。每章输出独立的 plot_000x.txt，同时生成 manifest.json 记录全书生成状态、章节摘要、场景数、记忆状态和审查结果。
 
-本项目已实现：前端交互页面、EPUB/文本章节处理、Python 后端、大模型真实调用、LangGraph 多 Agent 工作流、章节级结构化剧本生成、章节级审查、长短期记忆、RAG 长期记忆检索、YAML/txt 文件落盘和 manifest 汇总。
+我们采用双模式方法，一个采用多Agent方法，使用 LangGraph 编排背景、人物、关系、选型、编剧、审稿、连续性检查和摘要节点（消耗Token更多）；一个采用单Agent方法，使用RAG方法与提示词工程进行小说人物地点的记忆以及故事的流程编排（消耗Token更少）。
+### 🧠 1. 基于双路 RAG 的长期实体记忆仓
+* **实体级记忆持久化**：系统在底层建立独立的人物设定池与地理场所池。在处理每一章时，AI 会自动从向量库中跨时空调取相关的历史线索。
+* **状态动态进化打标**：长效追踪剧情发展。当有全新人物或地点登场时，系统会自动持久化录入；若既有老人物、老地点的状态或行为模式发生更迭（如深化、负伤、关系转变），系统将实时动态更新写入记忆仓，彻底解决长文本下 LLM “前言不搭后语” 的幻觉问题。
 
-## 项目概述
+### 📖 2. 故事主线动态留存的短期记忆
+* **剧情概述承启轴**：每一章节在生成过程中，AI 会同步提炼并沉淀本章的剧情备忘录。
+* **全局主线强约束**：通过精简的短期记忆体，在生成下一章节时强制喂给大模型作为上下文输入。让 LLM 时刻感知当前最新的故事发展状况、掌握剧情核心脉络，死死锁住故事走向，绝不脱离整体主线轨道。
 
-NovelScriptAI 是一个“前端 + FastAPI 后端 + LangGraph 多 Agent + OpenAI-compatible 大模型”的 AI 小说转剧本系统。
+### 🎥 3. 工业级标准剧本分镜流水线
+* **场景结构化切片**：正文彻底告别传统小说的纯文本堆砌，严格按照电影工业标准以“场景”为核心单元进行结构化排版。
+* **角色/动作/台词独立成舱**：客观环境描述、角色舞台动作、主观台词对白均拥有独立的视觉卡片包裹。相同角色的对白舱采用专属动态色系映射，多人混战对话一目了然。
+* **原文段落精准回溯**：每一段分镜场景都具备段落锚点，能够实时精准反向对应到原始小说中的具体段落（`[p_i]`），方便编剧或导演随时肉眼比对原作修正。
 
-用户可以上传或粘贴小说文本，系统会按章节/分段逐步调用大模型，将小说内容转换为可编辑的剧本初稿。每章输出独立的 `plot_000x.txt`，同时生成 `manifest.json` 记录全书生成状态、章节摘要、场景数、记忆状态和审查结果。
+### 📂 4. 电子书（EPUB）智能解构与章节治理
+* **原生结构完美解析**：系统无缝支持 `.epub` 标准电子书格式文件输入。
+* **全自动断章流水线**：一键将数万字甚至数十万字的长篇小说按原始章节目录进行多线程智能拆解与高颗粒度治理，将其解构为适合大模型吞吐的黄金上下文切片。
+---
 
-核心目标不是替代作者完成最终剧本，而是把“从小说段落到可改剧本初稿”的机械工作交给 AI，让作者更快进入二次创作、结构调整和台词打磨。
+## 🛠️ 技术栈蓝图
 
-## 视频演示
+本工作站采用现代前后端完全解耦的架构，前端聚焦于多模态响应式排版与状态锁闭环，后端聚焦于图网络状态机与记忆检索沉淀。
 
-【ai小说转剧本】 https://www.bilibili.com/video/BV16ME464Egu/?share_source=copy_web&vd_source=ea2deb3030977806a732ef9a011db4b2
+### 💻 前端技术栈 (Frontend Hub)
+* **核心框架**：`Vue 3` (采用 Setup 语法糖与 SFC 规范，保证组件高内聚)
+* **工程脚手架**：`Vite` (提供微秒级极速 HMR 热更新与工业级编译优化)
+* **状态存储桶**：`Pinia` (全局状态集散中心，实现章节快照数据的绝对隔离存储)
+* **流式数据总线**：`Server-Sent Events (SSE)` (原生轻量级长连接，支撑高性能碎字流式吐字)
 
-## 核心功能
-
-- 小说文本转结构化剧本：支持 3 章以上小说文本，按章节或分段生成剧本初稿。
-- EPUB 解析：支持上传 EPUB，将章节拆分到 `data/temp_epubs` 供后续项目式转换。
-- YAML/txt 输出：每章生成符合模板的剧本结构，并保存为 `plot_000x.txt`。
-- 流式生成体验：前端通过 NDJSON 流接收章节开始、章节完成和错误事件。
-- 多 Agent 工作流：使用 LangGraph 编排背景、人物、关系、选型、编剧、审稿、连续性检查和摘要节点。
-- 长短期记忆：短期记忆保存最近章节摘要，长期记忆保存人物、地点、事实、未解决线索。
-- RAG 检索：将关键人物、设定、关系、伏笔写入向量记忆，后续章节按需检索。
-- 章节级质量检查：对每章进行格式检查和连续性检查，失败时可触发重写。
-- 用户/任务隔离：通过 `user_id` 和 `thread_id` 隔离不同作者、不同改编任务的记忆与输出。
-
-## 技术栈
+### 🐍 后端技术栈 (Backend Core)
+* **开发语言**：`Python 3.10+` (强类型声明与异步并发控制)
+* **Agent 编排引擎**：`LangGraph` (基于状态图的有向图网络拓扑治理方案，负责节点流转与自愈条件拦截)
+* **本地向量底座**：`ChromaDB` (轻量化高持久化嵌入向量数据库，负责历史 RAG 实体记忆持久化)
+* **大模型驱动**：`OpenAI SDK` / `DeepSeek API` (提供长上下文深度推理基座与高经济性流式文本输出)
 
 | 模块 | 技术 |
 | --- | --- |
-| 前端 | HTML、CSS、原生 JavaScript |
 | 后端 Web 服务 | FastAPI、Uvicorn |
 | 数据模型 | Pydantic v2、pydantic-settings |
 | 大模型调用 | LangChain、langchain-openai、OpenAI-compatible Chat Completions |
@@ -54,416 +65,203 @@ NovelScriptAI 是一个“前端 + FastAPI 后端 + LangGraph 多 Agent + OpenAI
 | RAG 长期记忆 | ChromaDB，或本地 JSON fallback |
 | 测试 | unittest、py_compile |
 
-## 项目结构
+![1780749094343](image/1780749094343.png)
+---
 
-```text
-.
-├── app/
-│   ├── api/                         # FastAPI 路由
-│   │   ├── health.py                # 健康检查
-│   │   ├── scripts.py               # 剧本转换、项目转换、记忆接口
-│   │   └── epub.py                  # EPUB 上传与章节读取
-│   ├── agent/script_graph/          # LangGraph 多 Agent 剧本生成工作流
-│   │   ├── workflow.py              # StateGraph 节点和条件边编排
-│   │   ├── nodes.py                 # 各 Agent 节点实现
-│   │   ├── prompts.py               # 各节点 Prompt
-│   │   ├── schemas.py               # 结构化输出 Pydantic Schema
-│   │   ├── state.py                 # 图状态定义
-│   │   ├── memory_ops.py            # 记忆合并与 Prompt 压缩
-│   │   └── llm.py                   # LangChain LLM 创建与结构化解析
-│   ├── services/
-│   │   ├── chapter_splitter.py      # 小说分章
-│   │   ├── script_project_service.py# EPUB/项目式逐章转换与落盘
-│   │   ├── memory_store.py          # JSON 长短期记忆
-│   │   ├── vector_memory.py         # RAG 向量记忆
-│   │   ├── yaml_builder.py          # YAML 序列化
-│   │   └── schema_validator.py      # Schema 校验工具
-│   ├── models/                      # 请求/响应模型
-│   ├── core/                        # LLM/MCP 基础客户端
-│   └── main.py                      # FastAPI 应用入口
-├── docs/
-│   ├── yaml_schema.md               # 剧本 YAML Schema 文档及设计原因
-│   └── architecture.md              # 架构和记忆设计说明
-├── src/app.js                       # 前端交互逻辑
-├── index.html                       # 前端页面
-├── styles.css                       # 前端样式
-├── template.yaml                    # 用户侧章节剧本 YAML 模板
-├── requirements.txt                 # Python 依赖
-└── data/                            # 运行时数据目录
-```
+## 🚀 快速通车指南
 
-## 环境搭建
-
-建议使用 Python 3.11 或更高版本。
-
+### 1. 克隆与环境准备
 ```bash
-python -m venv .venv
-```
-
-Windows PowerShell：
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-macOS/Linux：
-
-```bash
-source .venv/bin/activate
-```
-
-安装依赖：
-
-```bash
+# 克隆仓库
+git clone [https://github.com/your-username/novel2script-ui.git](https://github.com/your-username/novel2script-ui.git)
+# 安装后端依赖
 pip install -r requirements.txt
+# 启动后端
+uvicorn app.main:app --reload --port 8000
+# 进入前端项目目录
+cd novel2script-ui
+# 前端依赖安装
+npm install
+# 前端启动
+npm run dev
+
 ```
+启动成功后，打开浏览器访问 http://localhost:5173 即可进入控制台。（访问http://127.0.0.1:8000可以进入旧后端旧前端页面）
+点击上传剧本后，再点击生成整本剧本即可看到剧本的整体生成。
+### 2. 大模型配置
 
-## 大模型配置
-
-项目使用 OpenAI-compatible 接口。请在项目根目录创建 `.env` 文件：
+项目使用 OpenAI-compatible 接口。请在项目根目录复制`.env.example`为 `.env` 文件，并修改LLM模型配置内容：
 
 ```text
 LLM_BASE_URL=https://api.deepseek.com
-LLM_MODEL=deepseek-chat
+LLM_MODEL=deepseek-v4-flash
+LONG_AGENT_MODEL=deepseek-chat
 LLM_API_KEY=你的真实 API Key
-
-LLM_MAX_TOKENS=8192
-LLM_TIMEOUT_SECONDS=90
-LLM_MAX_RETRIES=2
-LLM_STRUCTURED_OUTPUT_METHOD=function_calling
 ```
 
-也兼容常见环境变量：
+LONG_AGENT_MODEL为多Agent模式使用模型，只能使用非思考模型，LLM_MODEL为单Agent模式使用模型，可使用任意模型。
 
-```text
-OPENAI_BASE_URL=https://api.example.com/v1
-OPENAI_API_KEY=你的真实 API Key
-DASHSCOPE_API_KEY=你的真实 API Key
-DASHSCOPE_MODEL=qwen-max
-```
+
 
 如果未配置 API Key，后端会返回配置错误，不会使用假数据伪装生成成功。
+## 📦 项目模块骨架
 
-## 启动项目
+本系统由后端核心服务（FastAPI + LangGraph）与前端交互工作台（Vue 3 + Vite）共同构成。以下为完整的工程资产目录树：
 
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-访问：
+### 🐍 1. 后端骨架 (Python + FastAPI Core)
 
 ```text
-http://127.0.0.1:8000
+  feiniuyun/
+  ├── app/                                # 🚀 主应用核心内胆
+  │   ├── __init__.py
+  │   ├── main.py                         # FastAPI 服务网关入口
+  │   │
+  │   ├── api/                            # 🛣️  路由控制层 (RESTful API)
+  │   │   ├── __init__.py
+  │   │   ├── health.py                   # 节点生命周期健康检查
+  │   │   ├── epub.py                     # EPUB 电子书解析分片接口
+  │   │   ├── scripts.py                  # 剧本流式生成 & SSE 输出接口
+  │   │   └── script_routes.py            # 剧本项目级综合路由
+  │   │
+  │   ├── agent/                          # 🧠 多智能体 LangGraph 引擎
+  │   │   ├── __init__.py
+  │   │   └── script_graph/
+  │   │       ├── workflow.py             # StateGraph 编排 & 章节循环驱动
+  │   │       ├── state.py                # ScriptGraphState 跨节点全局状态舱
+  │   │       ├── nodes.py                # 8 个 LLM 智能体节点实现
+  │   │       ├── llm.py                  # ChatOpenAI 工厂 + invoke_structured
+  │   │       ├── prompts.py              # ChatPromptTemplate 提示词模板库
+  │   │       ├── schemas.py              # Pydantic 结构化输出契约
+  │   │       ├── memory_ops.py           # 长短期记忆压缩合并工具
+  │   │       └── demo.py                 # 命令行演示入口
+  │   │
+  │   ├── core/                           # ⚙️  底层核心基础设施
+  │   │   ├── __init__.py
+  │   │   ├── llm_client.py               # LLM 底层客户端封装
+  │   │   └── mcp_client.py               # MCP 工具协议客户端
+  │   │
+  │   ├── models/                         # 📋 外部请求/响应数据模型
+  │   │   ├── __init__.py
+  │   │   ├── request.py                  # 请求体 Pydantic 模型
+  │   │   └── response.py                 # 响应体 Pydantic 模型
+  │   │
+  │   ├── services/                       # ⚙️  业务逻辑层 (纯服务流水线)
+  │   │   ├── __init__.py
+  │   │   ├── adaptation_service.py       # 改编编排总服务
+  │   │   ├── chapter_splitter.py         # 小说文本分章切割器
+  │   │   ├── epub_hand.py                # EPUB 文件物理二进制提取
+  │   │   ├── llm_output_parser.py        # LLM JSON 输出健壮解析
+  │   │   ├── memory_store.py             # 文件化记忆持久存储
+  │   │   ├── novel_converter.py          # 小说文本结构化矩阵转换
+  │   │   ├── prompt_builder.py           # 动态提示词装配器
+  │   │   ├── schema_validator.py         # YAML Schema 校验器
+  │   │   ├── script_project_service.py   # 剧本项目全生命周期服务
+  │   │   ├── story_registry.py           # 剧情注册 & 查询
+  │   │   ├── vector_memory.py            # ChromaDB 向量记忆检索
+  │   │   └── yaml_builder.py             # Python → template.yaml 构建器
+  │   │
+  │   └── tools/                          # 🔧 MCP 可注册工具库
+  │       ├── __init__.py
+  │       ├── base.py                     # 工具基类 & 接口定义
+  │       ├── registry.py                 # 工具注册中心
+  │       ├── schema_tool.py              # YAML Schema 校验工具
+  │       └── text_stats_tool.py          # 文本统计信息工具
+  │
+  ├── configs/                            # 🎛️  静态提示词与环境策略配置目录
+  │   └── prompts_config.json            # LLM 系统提示词 + 用户提示词模板
+  │
+  ├── data/                               # 💾 数据持久化底座
+  │   ├── chroma_db/                      # ChromaDB 本地向量数据库仓
+  │   └── temp_epubs/                     # 临时上传的电子书暂存区
+  │
+  ├── docs/                               # 📖 项目文档库
+  │   ├── README.md                       # 主文档
+  │   ├── architecture.md                 # 架构设计说明
+  │   ├── yaml_schema.md                  # YAML 模板规范
+  │   └── images/                         # 架构图、流程图资产
+  │
+  ├── tests_py/                           # 🧪 测试与验证套件
+  │   ├── test_core_services.py           # 后端核心服务单元测试
+  │   ├── test_epub.py                    # EPUB 解析集成测试
+  │   ├── test_script_graph_workflow.py   # Agent 全流水线端到端测试
+  │   ├── test_script_project_service.py  # 剧本项目服务单元测试
+  │   ├── pipeline_v1.py                  # V1 原始流水线 (预 LangGraph)
+  │   ├── pipeline_v2_langgraph.py        # V2 LangGraph 原型流水线
+  │   ├── pipeline_v3_chroma.py           # V3 向量记忆增强流水线
+  │   ├── make_test_epub.py               # 微型测试用 EPUB 生成器
+  │   └── trim_epub.py                    # 大 EPUB 截片裁切工具
+  │
+  ├── dataset/                            # 📚 原始小说样本数据集
+  ├── samples/                            # 📝 示例文件
+  ├── output_scripts/                     # 📤 转换输出存档
+  │
+  ├── template.yaml                       # 📄 剧本 YAML 输出模板
+  ├── requirements.txt                    # 依赖清单
+  ├── .env / .env.example                 # 本地敏感密钥环境变量
+  └── README.md                           # 根目录自述说明
+```
+### 💻 2. 前端骨架 (Vue 3 + Vite + Pinia Dashboard)
+``` text
+feiniuyun/novel2script-ui/  ├── index.html                          # 单页面应用 (SPA) 主入口
+  ├── vite.config.js                      # Vite 构建管线与工程反向代理配置  ├── jsconfig.json                       # 路径别名 (@/*) 自动化检索配置
+  ├── package.json                        # 前端第三方生态依赖管理
+  │
+  ├── public/                             # 🎨 离线静态底层全局资产
+  └── src/
+      ├── main.js                         # Vue 应用初始化引导入口
+      ├── App.vue                         # 挂载渲染根组件
+      │
+      ├── router/                         # 🛣️  单页视图路由导航网
+      │   └── index.js
+      │
+      ├── stores/                         # 📦 状态控制总仓 (Pinia State)
+      │   ├── novelStore.js               # 核心快照隔离存储桶 (解决串台 Bug)
+      │   └── agentStore.js               # 新增 Agent 流式状态 & 进度跟踪
+      │
+      ├── api/                            # 📡 异步网络总线
+      │   └── backend.js                  # Axios 后端 RESTful 统一映射
+      │
+      ├── services/                       # 🌊 长连接流式传送带
+      │   ├── sseService.js               # SSE 长连接高频事件收音机
+      │   └── agentSseService.js          # Agent 专属 SSE 多通道事件流
+      │
+      ├── composables/                    # 🧪 组合式逻辑抽象 (Vue Use)
+      │   ├── useNovelStream.js           # 封装高频蹦字流式生命周期
+      │   └── useAgentStream.js           # Agent 多节点流式编排 & 自动重连
+      │
+      ├── views/                          # 🖼️  工作台大视图看板
+      │   └── WorkbenchView.vue           # AI 编剧核心中央工作台
+      │
+      ├── components/                     # 🧩 复用高内聚 UI 组件库
+      │   ├── NovelUploader.vue           # 拖拽式 EPUB 小说上传舱
+      │   ├── ChapterList.vue             # 智能联动目录树
+      │   ├── ScriptPreview.vue           # 剧本正文视窗容器 (新版流式)
+      │   ├── ScriptPreview copy.vue      # 旧版剧本视窗 (历史存档)
+      │   ├── ProjectStream.vue           # 转换日志流式观察哨
+      │   │
+      │   └── workbench/                  # 🎛️  工作台子模块高定专区
+      │       ├── NovelViewer.vue         # 小说原文等宽滚动阅览器
+      │       ├── AiDashboard.vue         # AI 控制中心多模态主板
+      │       ├── LegacyScriptViewer.vue  # 旧版剧本正文回退展示
+      │       │
+      │       ├── ai-dashboard-modules/   # 🌟 看板细分高阶组件
+      │       │   ├── MemoryExtractor.vue # 增量长期记忆自动打标块
+      │       │   ├── MemoryMatrix.vue    # RAG 左右并列实体悬浮窗胶囊墙
+      │       │   ├── ScriptViewer.vue    # 多模态剧本正文切换面板
+      │       │   └── StoryProgress.vue   # 剧情承启（前情与新概述）蓝图卡
+      │       │
+      │       └── agents/                 # 🤖 Agent 智能体可视化面板
+      │           ├── AgentAnalysisPanel.vue  # 分析阶段 (Background/Character等) 实时面板
+      │           └── ScreenwriterPanel.vue   # 剧本生成界面
+      │
+      └── utils/                          # 🧰 前端静态纯函数工具箱
+          ├── download.js                 # 剧本一键结构化导出
+          ├── highlightYaml.js            # 极客终端高亮着色器
+          └── scriptParsers.js            # 碎字抢救正则解析器
 ```
 
-FastAPI 会自动提供前端页面、`/src` 静态资源和 `styles.css`。
-
-## 前端设计
-
-前端位于 `index.html`、`styles.css`、`src/app.js`。
-
-前端主要职责：
-
-- 输入 `user_id`、`thread_id`、作品标题、改编方向、场景密度等参数。
-- 粘贴小说文本，或上传 EPUB 并预览章节。
-- 展示章节识别结果和字数信息。
-- 调用后端流式接口，实时显示当前处理到第几章/分段。
-- 接收每章生成结果，并追加到输出区域。
-- 展示 manifest、统计信息、记忆摘要和场景预览。
-- 支持复制和下载生成结果。
-
-前端不直接调用大模型，不保存长期记忆，也不做复杂剧本逻辑。它负责提供清晰的创作入口和可视化反馈，核心生成与校验全部交给后端。
-
-## 后端设计
-
-后端采用 FastAPI 分层设计。
-
-### API 层
-
-| 接口 | 说明 |
-| --- | --- |
-| `GET /api/health` | 健康检查 |
-| `POST /api/parse-epub` | 上传 EPUB，拆分章节并生成 metadata |
-| `GET /api/get-chapter` | 读取已拆分的章节文本 |
-| `GET /api/scripts/projects` | 列出已解析的 EPUB 项目 |
-| `POST /api/scripts/convert` | 直接将粘贴文本转换为 YAML |
-| `POST /api/scripts/convert-project` | 项目式转换，非流式返回 |
-| `POST /api/scripts/convert-project-stream` | 项目式转换，流式返回章节进度和结果 |
-| `GET /api/scripts/memory/{user_id}/{thread_id}` | 查看记忆快照 |
-| `POST /api/scripts/memory/clear` | 清除指定用户和线程的记忆 |
-
-### Service 层
-
-- `chapter_splitter.py`：识别“第一章/第二章/Chapter 1”等章节标题，必要时按长度自动分段。
-- `script_project_service.py`：项目式逐章生成，负责调用 LangGraph、保存 `plot_000x.txt`、生成 `manifest.json`。
-- `memory_store.py`：将短期和长期记忆保存为 JSON。
-- `vector_memory.py`：将人物、设定、关系、伏笔等写入 RAG 长期记忆。
-- `yaml_builder.py`：将结构化数据转换为 YAML。
-
-### Agent 层
-
-`app/agent/script_graph` 是本项目的核心智能工作流。它将“读小说、抽档案、写剧本、检查、总结”拆成多个节点，避免一个模型调用承担过多任务。
-
-## LangGraph 工作流设计
-
-每一章都会运行一次 LangGraph。外层循环负责逐章调用，图内部负责当前章节的多 Agent 处理。
-
-![1780749094343](image/1780749094343.png)
-
-### 各节点职责
-
-| 节点 | 是否调用模型 | 作用 |
-| --- | --- | --- |
-| `Background` | 是 | 提取地点、时代、组织、道具、服装、氛围、世界规则等背景信息 |
-| `Character` | 是 | 提取本章新增人物和本章人物状态变化 |
-| `Relationship` | 是 | 提取人物关系、冲突、联盟、压力线 |
-| `Casting` | 是 | 生成角色选型、造型、表演提示 |
-| `Prelude Merge` | 否 | 合并前四个节点输出，更新全局人物和设定档案 |
-| `Screenwriter` | 是 | 真正输出本章结构化剧本草稿 |
-| `Critic` | 是 | 检查格式、字段完整性、YAML 模板可用性 |
-| `Continuity Critic` | 是 | 检查本章与前文、长期记忆、人物设定是否冲突 |
-| `Summarizer` | 是 | 生成本章之后的滚动摘要，供下一章使用 |
-
-正常情况下，每章大约 7 次模型调用。若 `Critic` 或 `Continuity Critic` 触发重写，会额外调用 `Screenwriter` 和审查节点。若 `Character` 结构化输出失败，会用更短上下文重试一次，仍失败则跳过本章人物档案更新，保证项目继续运行。
-
-## 为什么按章节生成
-
-长篇小说不能一次性塞给模型。项目采用章节级流水线，原因是：
-
-- 控制上下文长度，降低模型输出截断和 JSON 解析失败概率。
-- 失败时可以定位到具体章节或分段。
-- 每章完成后立即落盘，避免后续章节失败导致前面结果丢失。
-- 逐章更新短期摘要和长期记忆，使后续章节保持连续。
-- 允许作者先获得可编辑 draft，再进行人工打磨或二次审查。
-
-当前流程是“章节级检查后输出章节 draft”。如果后续需要“全书级总审”，可以在所有章节生成完后增加 `Book Final Critic`，读取 manifest、全部章节摘要、长期人物档案和未解决线索，输出全书问题报告或最终修订建议。
-
-## 记忆与 RAG 设计
-
-### JSON 长短期记忆
-
-普通记忆保存位置：
-
-```text
-data/memory/{user_id}/{thread_id}.json
-```
-
-结构包括：
-
-```json
-{
-  "short_term": {
-    "window_chapters": 2,
-    "recent_chapters": []
-  },
-  "long_term": {
-    "book_title": "",
-    "logline": "",
-    "characters": {},
-    "locations": {},
-    "canon_facts": [],
-    "unresolved_threads": []
-  }
-}
-```
-
-短期记忆用于相邻章节衔接，长期记忆用于保存人物、地点、事实和伏笔。
-
-### RAG 向量记忆
-
-RAG 记忆保存位置：
-
-```text
-data/vector_memory
-```
-
-如果 ChromaDB 可用，使用：
-
-```text
-data/vector_memory/chroma
-```
-
-如果 ChromaDB 不可用，使用 JSON fallback：
-
-```text
-data/vector_memory/json/{namespace}.json
-```
-
-每章完成后，系统会把重要人物、设定、关系、伏笔、角色状态变化写入 RAG 记忆。下一章生成时只检索少量相关长期记忆，而不是把全部历史直接塞进 Prompt。
-
-这样设计的原因是：短期直接上下文保持轻量，长期信息按需取回，避免越生成到后面 Prompt 越膨胀。
-
-## 输出文件
-
-项目式转换会写入：
-
-```text
-data/script_outputs/{user_id}/{book_title}_{thread_id}_{timestamp}/
-```
-
-目录内主要文件：
-
-```text
-plot_0001.txt
-plot_0002.txt
-plot_0003.txt
-manifest.json
-```
-
-其中：
-
-- `plot_000x.txt`：第 x 个章节/分段的剧本初稿。
-- `manifest.json`：全书生成清单，包含章节标题、源文件、场景数、摘要、审查警告、记忆写入数量等。
-
-## YAML Schema 设计
-
-题目要求额外定义剧本 YAML Schema，并说明设计原因。本项目的详细文档在：
-
-```text
-docs/yaml_schema.md
-```
-
-项目同时使用 `template.yaml` 作为每章输出的用户侧模板。当前章节级输出核心结构如下：
-
-```yaml
-书名: string
-章节: string
-背景设定: string
-出场人物:
-  - 姓名: string
-    身份: string
-    性格: string
-场景列表:
-  - 场景序号: integer
-    发生地点: string
-    发生时间: string
-    场景人物:
-      - string
-    剧情动作: string
-    对话:
-      - 说话人: string
-        情感: string
-        台词: string
-```
-
-### 为什么这样设计
-
-1. 面向作者编辑，而不是只面向机器  
-   YAML 比 JSON 更容易阅读和手工修改，也比纯文本更适合程序继续处理。
-
-2. 以“场景”为核心  
-   剧本创作的基本单位是场景。`场景列表` 将小说叙述拆成可拍摄、可调度、可审查的结构。
-
-3. 保留人物表  
-   `出场人物` 让作者快速看到本章涉及的人物身份和性格，便于后续统一修改人物设定。
-
-4. 强制可拍摄动作  
-   `剧情动作` 避免模型只复述心理描写，要求其转成动作、调度、道具、空间和视觉信息。
-
-5. 台词结构化  
-   `说话人 / 情感 / 台词` 便于作者后续单独调整对白、语气和潜台词。
-
-6. 支持分批生成  
-   长篇小说需要逐章处理。章节字段、场景字段和 manifest 可以把分批生成结果重新汇总。
-
-7. 支持后续扩展  
-   `docs/yaml_schema.md` 中保留了更完整的 project/source/memory/characters/locations/script/review_notes 结构，便于未来扩展到全书级总审、人物小传和制作计划。
-
-## API 示例
-
-### 直接文本转换
-
-```http
-POST /api/scripts/convert
-```
-
-```json
-{
-  "user_id": "author_demo",
-  "thread_id": "adaptation_001",
-  "novel_text": "第一章 ...\n\n第二章 ...\n\n第三章 ...",
-  "title": "雨灯档案",
-  "target_format": "web_series",
-  "adaptation_tone": "现实感、强冲突、可拍摄",
-  "scene_density": 3,
-  "chapters_per_episode": 3,
-  "short_term_window": 2
-}
-```
-
-### EPUB 项目式流式转换
-
-先上传 EPUB：
-
-```http
-POST /api/parse-epub
-```
-
-再调用流式转换：
-
-```http
-POST /api/scripts/convert-project-stream
-```
-
-```json
-{
-  "user_id": "author_demo",
-  "thread_id": "adaptation_001",
-  "project_path": "静默的铁证(米烛光著)",
-  "title": "静默的铁证",
-  "target_format": "web_series",
-  "adaptation_tone": "现实感、强冲突、可拍摄",
-  "scene_density": 3,
-  "short_term_window": 2,
-  "max_chunk_chars": 8000,
-  "max_retries": 2
-}
-```
-
-流式事件示例：
-
-```json
-{"event": "start", "book_title": "静默的铁证", "unit_count": 12}
-{"event": "unit_start", "unit_index": 1, "chapter_title": "第一章"}
-{"event": "unit_done", "unit_index": 1, "act": {}, "plot_text": "..."}
-{"event": "done", "data": {}}
-```
-
-## 稳定性策略
-
-项目针对长文本和结构化输出做了多层防护：
-
-- 每章/分段处理，避免整本小说一次性进入模型。
-- `max_chunk_chars` 控制单次文本规模，默认 8000 字符。
-- Prompt 中只直接传上一章摘要、压缩人物档案和少量 RAG 结果。
-- `CharacterOutput` 限制人物数量、关系数量和文本长度，减少 JSON 截断。
-- 前置分析节点失败时可降级为空更新，不直接中断整本生成。
-- `Screenwriter` 输出后经过格式检查和连续性检查。
-- 每章完成后立即保存，降低长任务失败损失。
-
-## 测试
-
-推荐使用 Python 3.11 环境运行测试：
-
-```bash
-python -m py_compile app/agent/script_graph/memory_ops.py app/agent/script_graph/schemas.py app/agent/script_graph/nodes.py app/agent/script_graph/workflow.py app/agent/script_graph/prompts.py
-python -m unittest discover -s tests_py
-```
-
-测试主要覆盖章节拆分、Schema 校验、LangGraph 编排和项目服务逻辑。真实大模型调用需要 `.env` 中配置可用 API Key。
-
-## 使用建议
-
-- 输入至少 3 章小说文本，章节标题尽量使用“第一章”“第二章”等清晰格式。
-- 长章节建议保持默认分段上限 `8000`，以降低模型输出截断风险。
-- 每个新项目使用独立 `thread_id`，避免不同作品的记忆混在一起。
-- AI 输出是剧本初稿，不是最终定稿；作者应继续检查人物动机、伏笔回收、节奏和台词。
-
-## 当前能力边界
-
-当前系统已经支持章节级生成、章节级审查和全书 manifest 汇总。尚未实现全书生成后的统一总审节点。如果需要更完整的生产流程，可以继续扩展：
-
-- `Book Final Critic`：全书级剧情、人物弧线、伏笔回收和节奏审查。
-- `Revision Planner`：根据总审报告给出逐章修改计划。
-- `Final Exporter`：将章节 draft 汇总为最终版 YAML 或标准剧本格式。
-
+## 旧后端前端视频演示
+
+【ai小说转剧本】 https://www.bilibili.com/video/BV16ME464Egu/?share_source=copy_web&vd_source=ea2deb3030977806a732ef9a011db4b2
+## 后端具体设计
+具体前后端设计请查看 [项目架构与设计文档](./docs/architecture2.md)。
