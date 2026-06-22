@@ -191,7 +191,7 @@ const engineStatusInfo = computed(() => {
 
       <div class="script-preview__controls">
         <button class="btn btn-toggle" @click="toggleViewMode">
-          切换为：{{ viewMode === 'dashboard' ? '老版单章模式' : '最新项目引擎' }}
+          切换为：{{ viewMode === 'dashboard' ? '多Token消耗复杂模式' : '更少token消耗引擎' }}
         </button>
         <button
           class="btn btn--primary"
@@ -199,7 +199,7 @@ const engineStatusInfo = computed(() => {
           @click="handleGenerate"
         >
           <span v-if="viewMode === 'legacy'">
-            {{ store.isLoading ? '单章转换中…' : '单章生成剧本' }}
+            {{ store.isLoading ? '转换中…' : '生成剧本' }}
           </span>
           <span v-else>
             {{ store.sseState.isStreaming ? '⚡ 正在全自动生成...' : '🚀 生成整本剧本' }}
