@@ -87,7 +87,7 @@ class ScriptProjectService:
             raise ScriptProjectError("项目生成没有产生最终结果。")
         return final_data
 
-    async def stream_project_events(self, request: ConvertProjectRequest):
+    async def stream_project_events(self, request: ConvertProjectRequest, send_event_callback=None):
         project_dir = self._resolve_project_dir(request.project_path)
         metadata = self._read_json(project_dir / "metadata.json")
         book_title = request.title or metadata.get("book_title") or project_dir.name
@@ -153,6 +153,7 @@ class ScriptProjectService:
                 template_schema=template_schema,
                 scene_density=request.scene_density,
                 max_retries=request.max_retries,
+                send_event_callback=send_event_callback,
             )
 
             rolling_summary = result.get("rolling_summary", rolling_summary)
