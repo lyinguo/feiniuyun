@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,7 +35,11 @@ class Settings(BaseSettings):
         default="https://dashscope.aliyuncs.com/compatible-mode/v1",
         description="OpenAI-compatible API base URL",
     )
-    llm_model: str = "qwen-max"
+    # llm_model: str = "qwen-max"
+    llm_model: str = Field(
+        default="qwen-max", 
+        validation_alias=AliasChoices("LONG_AGENT_MODEL")
+    )
     llm_temperature: float = 0.25
     llm_max_tokens: int = 384000
     llm_timeout_seconds: float = 90.0
